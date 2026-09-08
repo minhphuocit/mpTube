@@ -6,33 +6,34 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import androidx.compose.foundation.layout.size
 import androidx.activity.ComponentActivity
-
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.activity.compose.setContent
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-
-import androidx.compose.runtime.key
+import androidx.compose.foundation.layout.BoxWithConstraints
 import android.app.Activity
-
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.foundation.text.KeyboardActions
@@ -61,8 +62,9 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -79,7 +81,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
@@ -734,99 +735,6 @@ fun VideoItem(
 
 
 // =========================================================
-// RELATED VIDEO ITEM
-// =========================================================
-
-@Composable
-fun RelatedVideoItem(
-    video: Video,
-    onClick: () -> Unit
-) {
-
-    Row(
-
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable {
-                    onClick()
-                }
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 6.dp
-                ),
-
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-
-        AsyncImage(
-
-            model =
-                video.thumbnailUrl,
-
-            contentDescription =
-                "Video thumbnail",
-
-            modifier =
-                Modifier
-                    .width(140.dp)
-                    .aspectRatio(
-                        16f / 9f
-                    )
-                    .clip(
-                        RoundedCornerShape(
-                            8.dp
-                        )
-                    ),
-
-            contentScale =
-                ContentScale.Crop
-        )
-
-        Column(
-
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(
-                        start = 10.dp
-                    )
-        ) {
-
-            Text(
-
-                text =
-                    video.title,
-
-                maxLines =
-                    2,
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodyLarge
-            )
-
-            Text(
-
-                text =
-                    video.channel,
-
-                maxLines =
-                    1,
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodySmall
-            )
-        }
-    }
-}
-
-
-// =========================================================
 // MAIN SCREEN
 // =========================================================
 
@@ -840,90 +748,206 @@ fun MainScreen() {
     var globalSearchQuery by remember {
         mutableStateOf<String?>(null)
     }
+    var isPlayerFullscreen by remember {
+        mutableStateOf(false)
+    }
+    val configuration =
+        LocalConfiguration.current
 
+    val isLandscape =
+        configuration.orientation ==
+                Configuration.ORIENTATION_LANDSCAPE
     Scaffold(
 
         bottomBar = {
 
-            NavigationBar {
+            if (!isPlayerFullscreen) {
 
-                NavigationBarItem(
+                if (isLandscape) {
 
-                    selected =
-                        selectedTab == 0,
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height(60.dp)
+                                .background(
+                                    Color.Transparent
+                                ),
+                        horizontalArrangement =
+                            Arrangement.SpaceEvenly,
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
 
-                    onClick = {
-                        selectedTab = 0
-                    },
+                        // Tất cả
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        selectedTab = 0
+                                    },
+                            horizontalAlignment =
+                                Alignment.CenterHorizontally,
+                            verticalArrangement =
+                                Arrangement.Center
+                        ) {
 
-                    icon = {
+                            Icon(
+                                imageVector =
+                                    Icons.Default.Home,
+                                contentDescription =
+                                    "Tất cả",
+                                modifier =
+                                    Modifier.size(20.dp)
+                            )
 
-                        Icon(
+                            Text(
+                                text = "Tất cả",
+                                style =
+                                    MaterialTheme.typography.labelSmall
+                            )
+                        }
 
-                            imageVector =
-                                Icons.Default.Home,
+                        // Âm nhạc
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        selectedTab = 1
+                                    },
+                            horizontalAlignment =
+                                Alignment.CenterHorizontally,
+                            verticalArrangement =
+                                Arrangement.Center
+                        ) {
 
-                            contentDescription =
-                                "Tất cả"
-                        )
-                    },
+                            Icon(
+                                imageVector =
+                                    Icons.Default.MusicNote,
+                                contentDescription =
+                                    "Âm nhạc",
+                                modifier =
+                                    Modifier.size(20.dp)
+                            )
 
-                    label = {
-                        Text("Tất cả")
+                            Text(
+                                text = "Âm nhạc",
+                                style =
+                                    MaterialTheme.typography.labelSmall
+                            )
+                        }
+
+                        // Thông tin
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clickable {
+                                        selectedTab = 2
+                                    },
+                            horizontalAlignment =
+                                Alignment.CenterHorizontally,
+                            verticalArrangement =
+                                Arrangement.Center
+                        ) {
+
+                            Icon(
+                                imageVector =
+                                    Icons.Default.Info,
+                                contentDescription =
+                                    "Thông tin",
+                                modifier =
+                                    Modifier.size(20.dp)
+                            )
+
+                            Text(
+                                text = "Thông tin",
+                                style =
+                                    MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
-                )
 
-                NavigationBarItem(
+                } else {
 
-                    selected =
-                        selectedTab == 1,
+                    // DỌC: giữ NavigationBar Material 3 như cũ
+                    NavigationBar(
+                        containerColor = Color.Transparent
+                    ) {
 
-                    onClick = {
-                        selectedTab = 1
-                    },
+                        NavigationBarItem(
+                            selected =
+                                selectedTab == 0,
 
-                    icon = {
+                            onClick = {
+                                selectedTab = 0
+                            },
 
-                        Icon(
+                            icon = {
+                                Icon(
+                                    imageVector =
+                                        Icons.Default.Home,
+                                    contentDescription =
+                                        "Tất cả"
+                                )
+                            },
 
-                            imageVector =
-                                Icons.Default.MusicNote,
-
-                            contentDescription =
-                                "Âm nhạc"
+                            label = {
+                                Text("Thịnh Hành")
+                            }
                         )
-                    },
 
-                    label = {
-                        Text("Âm nhạc")
-                    }
-                )
+                        NavigationBarItem(
+                            selected =
+                                selectedTab == 1,
 
-                NavigationBarItem(
+                            onClick = {
+                                selectedTab = 1
+                            },
 
-                    selected =
-                        selectedTab == 2,
+                            icon = {
+                                Icon(
+                                    imageVector =
+                                        Icons.Default.MusicNote,
+                                    contentDescription =
+                                        "Âm nhạc"
+                                )
+                            },
 
-                    onClick = {
-                        selectedTab = 2
-                    },
-
-                    icon = {
-
-                        Icon(
-
-                            imageVector =
-                                Icons.Default.Info,
-
-                            contentDescription =
-                                "Thông tin"
+                            label = {
+                                Text("Âm Nhạc")
+                            }
                         )
-                    },
 
-                    label = {
-                        Text("Thông tin")
+                        NavigationBarItem(
+                            selected =
+                                selectedTab == 2,
+
+                            onClick = {
+                                selectedTab = 2
+                            },
+
+                            icon = {
+                                Icon(
+                                    imageVector =
+                                        Icons.Default.Info,
+                                    contentDescription =
+                                        "Thông tin"
+                                )
+                            },
+
+                            label = {
+                                Text("Thông Tin")
+                            }
+                        )
                     }
-                )
+                }
             }
         }
     ) { paddingValues ->
@@ -955,6 +979,13 @@ fun MainScreen() {
 
                             selectedTab =
                                 0
+                        },
+
+                        onPlayerFullscreenChanged = {
+                                fullscreen ->
+
+                            isPlayerFullscreen =
+                                fullscreen
                         }
                     )
                 }
@@ -971,6 +1002,13 @@ fun MainScreen() {
 
                             selectedTab =
                                 0
+                        },
+
+                        onPlayerFullscreenChanged = {
+                                fullscreen ->
+
+                            isPlayerFullscreen =
+                                fullscreen
                         }
                     )
                 }
@@ -995,7 +1033,10 @@ fun HomeScreen(
     String? = null,
 
     onSearchFromPlayer:
-        (String) -> Unit = {}
+        (String) -> Unit = {},
+
+    onPlayerFullscreenChanged:
+        (Boolean) -> Unit = {}
 ) {
 
     val context =
@@ -1030,7 +1071,7 @@ fun HomeScreen(
     }
 
     var searchTrigger by remember {
-        mutableIntStateOf(0)
+        mutableStateOf(0)
     }
 
     var selectedVideo by remember {
@@ -1128,7 +1169,7 @@ fun HomeScreen(
                     null
 
                 apiResult =
-                    "Thịnh hành"
+                    "   Trending..."
 
             }
 
@@ -1234,13 +1275,6 @@ fun HomeScreen(
                     null
             },
 
-            onVideoSelected = {
-                    newVideo ->
-
-                selectedVideo =
-                    newVideo
-            },
-
             onSearch = {
                     query ->
 
@@ -1252,6 +1286,14 @@ fun HomeScreen(
 
                 onSearchFromPlayer(
                     query
+                )
+            },
+
+            onFullscreenChanged = {
+                    fullscreen ->
+
+                onPlayerFullscreenChanged(
+                    fullscreen
                 )
             }
         )
@@ -1606,7 +1648,10 @@ fun HomeScreen(
 @Composable
 fun MusicScreen(
     onSearchFromPlayer:
-        (String) -> Unit = {}
+        (String) -> Unit = {},
+
+    onPlayerFullscreenChanged:
+        (Boolean) -> Unit = {}
 ) {
 
     val context =
@@ -1738,13 +1783,6 @@ fun MusicScreen(
                     null
             },
 
-            onVideoSelected = {
-                    newVideo ->
-
-                selectedVideo =
-                    newVideo
-            },
-
             onSearch = {
                     query ->
 
@@ -1756,6 +1794,14 @@ fun MusicScreen(
 
                 onSearchFromPlayer(
                     query
+                )
+            },
+
+            onFullscreenChanged = {
+                    fullscreen ->
+
+                onPlayerFullscreenChanged(
+                    fullscreen
                 )
             }
         )
@@ -1843,7 +1889,7 @@ fun MusicScreen(
                     "Đang tải...",
 
                 message =
-                    "Đang tìm nhạc trên YouTube."
+                    "Đang tìm nhạc ..."
             )
 
         } else {
@@ -2035,20 +2081,22 @@ fun AboutScreen() {
     }
 }
 
-
 // =========================================================
 // PLAYER SCREEN
 // =========================================================
 
 @Composable
 fun PlayerScreen(
+
     video: Video,
 
     onBack: () -> Unit,
 
-    onVideoSelected: (Video) -> Unit,
+    onSearch: (String) -> Unit,
 
-    onSearch: (String) -> Unit
+    onFullscreenChanged:
+        (Boolean) -> Unit = {}
+
 ) {
 
     val context =
@@ -2056,6 +2104,7 @@ fun PlayerScreen(
 
     val repository =
         remember(context) {
+
             YoutubeRepository(
                 context.applicationContext
             )
@@ -2065,142 +2114,147 @@ fun PlayerScreen(
         context as? LifecycleOwner
 
     var searchText by remember {
+
         mutableStateOf("")
     }
 
     var searchOpen by remember {
+
         mutableStateOf(false)
     }
 
     var isFullscreen by remember {
+
         mutableStateOf(false)
     }
 
+    // ---------------------------------------------------------
+    // AUTOPLAY STATE
+    // ---------------------------------------------------------
     var relatedVideos by remember {
         mutableStateOf<List<Video>>(
             emptyList()
         )
     }
 
-    var relatedNextPageToken by remember {
-        mutableStateOf<String?>(null)
-    }
-
-    var isLoadingRelated by remember {
+    var relatedLoading by remember(
+        video.videoId
+    ) {
         mutableStateOf(false)
     }
 
-    var relatedLoaded by remember {
+    var relatedLoaded by remember(
+        video.videoId
+    ) {
         mutableStateOf(false)
     }
 
-    var relatedErrorMessage by remember {
-        mutableStateOf<String?>(null)
+    var autoplayWaitingForRelated by remember(
+        video.videoId
+    ) {
+        mutableStateOf(false)
     }
 
-    val scope =
-        rememberCoroutineScope()
-
-    // =========================================================
-    // RELATED
-    // =========================================================
-
-    fun loadRelatedVideos(
-        pageToken: String? = null
+    var activePlayer by remember(
+        video.videoId
+    ) {
+        mutableStateOf<YouTubePlayer?>(null)
+    }
+    var autoplayVideo by remember(
+        video.videoId
     ) {
 
-        if (isLoadingRelated) {
-            return
-        }
-
-        isLoadingRelated =
-            true
-
-        scope.launch {
-
-            try {
-
-                relatedErrorMessage =
-                    null
-
-                val response =
-                    repository.getRelatedVideos(
-
-                        videoId =
-                            video.videoId,
-
-                        videoTitle =
-                            video.title,
-
-                        pageToken =
-                            pageToken
-                    )
-
-                val newVideos =
-                    response.items.mapNotNull { item ->
-
-                        val videoId =
-                            item.id.videoId
-
-                        if (
-                            videoId.isBlank()
-                        ) {
-                            null
-                        } else {
-
-                            Video(
-
-                                videoId =
-                                    videoId,
-
-                                title =
-                                    item.snippet.title,
-
-                                channel =
-                                    item.snippet.channelTitle,
-
-                                thumbnailUrl =
-                                    item.snippet
-                                        .thumbnails
-                                        .medium
-                                        .url
-                            )
-                        }
-                    }
-
-                relatedVideos =
-                    if (
-                        pageToken == null
-                    ) {
-                        newVideos
-                    } else {
-                        relatedVideos +
-                                newVideos
-                    }
-
-                relatedNextPageToken =
-                    response.nextPageToken
-
-                relatedLoaded =
-                    true
-
-            } catch (e: Exception) {
-
-                relatedErrorMessage =
-                    getYoutubeErrorMessage(
-                        e
-                    )
-
-            } finally {
-
-                isLoadingRelated =
-                    false
-            }
-        }
+        mutableStateOf(video)
     }
 
+    var nextAutoplayVideo by remember(
+        video.videoId
+    ) {
+
+        mutableStateOf<Video?>(null)
+    }
+
+    var autoplayLoading by remember(
+        video.videoId
+    ) {
+
+        mutableStateOf(false)
+    }
+
+    var autoplayPrepared by remember(
+        video.videoId
+    ) {
+
+        mutableStateOf(false)
+    }
+
+    var videoDuration by remember(
+        video.videoId
+    ) {
+
+        mutableStateOf(0f)
+    }
+
+    var autoplayCount by remember(
+        video.videoId
+    ) {
+
+        mutableStateOf(1)
+    }
+
+    var autoplayFinished by remember(
+        video.videoId
+    ) {
+
+        mutableStateOf(false)
+    }
+    var currentVideoPosition by remember(
+        video.videoId
+    ) {
+        mutableStateOf(0f)
+    }
+    val currentRelatedVideos =
+        rememberUpdatedState(
+            relatedVideos
+        )
+
+    val currentNextAutoplayVideo =
+        rememberUpdatedState(
+            nextAutoplayVideo
+        )
+
+    val currentAutoplayFinished =
+        rememberUpdatedState(
+            autoplayFinished
+        )
+
+    val currentAutoplayPrepared =
+        rememberUpdatedState(
+            autoplayPrepared
+        )
+
+    val currentAutoplayLoading =
+        rememberUpdatedState(
+            autoplayLoading
+        )
+
+    val currentVideoDuration =
+        rememberUpdatedState(
+            videoDuration
+        )
+
+    val currentAutoplayCount =
+        rememberUpdatedState(
+            autoplayCount
+        )
+
+    val currentAutoplayVideo =
+        rememberUpdatedState(
+            autoplayVideo
+        )
+
     // =========================================================
-    // RESET RELATED
+    // LOAD RELATED VIDEOS
     // =========================================================
 
     LaunchedEffect(
@@ -2210,16 +2264,113 @@ fun PlayerScreen(
         relatedVideos =
             emptyList()
 
-        relatedNextPageToken =
-            null
-
         relatedLoaded =
             false
 
-        relatedErrorMessage =
-            null
+        relatedLoading =
+            true
 
-        loadRelatedVideos()
+        autoplayWaitingForRelated =
+            false
+
+        try {
+
+            val response =
+                repository.getRelatedVideos(
+                    videoId =
+                        video.videoId,
+
+                    videoTitle =
+                        video.title
+                )
+
+            relatedVideos =
+                response.items.mapNotNull { item ->
+
+                    val id =
+                        item.id.videoId
+
+                    if (id.isBlank()) {
+                        null
+                    } else {
+                        Video(
+                            videoId = id,
+                            title = item.snippet.title,
+                            channel = item.snippet.channelTitle,
+                            thumbnailUrl =
+                                item.snippet.thumbnails.medium.url
+                        )
+                    }
+                }
+
+        } catch (_: Exception) {
+
+            relatedVideos =
+                emptyList()
+
+        } finally {
+
+            relatedLoaded =
+                true
+
+            relatedLoading =
+                false
+        }
+    }
+
+    // Continue automatically if the video ended while Related was loading.
+    LaunchedEffect(
+        relatedVideos,
+        autoplayWaitingForRelated,
+        activePlayer
+    ) {
+
+        if (!autoplayWaitingForRelated) {
+            return@LaunchedEffect
+        }
+
+        val player =
+            activePlayer
+                ?: return@LaunchedEffect
+
+        val nextIndex =
+            autoplayCount - 1
+
+        val nextVideo =
+            relatedVideos.getOrNull(nextIndex)
+
+        if (
+            nextVideo != null &&
+            autoplayCount <= 10
+        ) {
+
+            autoplayVideo =
+                nextVideo
+
+            autoplayCount++
+
+            autoplayFinished =
+                false
+
+            autoplayWaitingForRelated =
+                false
+
+            videoDuration =
+                0f
+
+            player.loadVideo(
+                nextVideo.videoId,
+                0f
+            )
+
+        } else if (relatedLoaded && !relatedLoading) {
+
+            autoplayWaitingForRelated =
+                false
+
+            autoplayFinished =
+                true
+        }
     }
 
     // =========================================================
@@ -2230,22 +2381,28 @@ fun PlayerScreen(
         isFullscreen
     ) {
 
+        onFullscreenChanged(
+            isFullscreen
+        )
+
         val activity =
             context as? Activity
                 ?: return@LaunchedEffect
 
         val controller =
             WindowInsetsControllerCompat(
+
                 activity.window,
+
                 activity.window.decorView
             )
 
-        if (
-            isFullscreen
-        ) {
+        if (isFullscreen) {
 
             controller.hide(
-                WindowInsetsCompat.Type.systemBars()
+                WindowInsetsCompat
+                    .Type
+                    .systemBars()
             )
 
             controller.systemBarsBehavior =
@@ -2255,7 +2412,9 @@ fun PlayerScreen(
         } else {
 
             controller.show(
-                WindowInsetsCompat.Type.systemBars()
+                WindowInsetsCompat
+                    .Type
+                    .systemBars()
             )
         }
     }
@@ -2274,327 +2433,25 @@ fun PlayerScreen(
     }
 
     // =========================================================
-// PLAYER UI
-// =========================================================
+    // FULLSCREEN
+    // =========================================================
 
-    Box(
-        modifier =
-            Modifier.fillMaxSize()
-    ) {
+    if (isFullscreen) {
 
-        // =====================================================
-        // NORMAL UI
-        // =====================================================
+        BoxWithConstraints(
 
-        if (!isFullscreen) {
-
-            Surface(
-
-                modifier =
-                    Modifier.fillMaxSize(),
-
-                color =
-                    MaterialTheme
-                        .colorScheme
-                        .background,
-
-                contentColor =
-                    MaterialTheme
-                        .colorScheme
-                        .onBackground
-            ) {
-
-                Column(
-
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .verticalScroll(
-                                rememberScrollState()
-                            )
-                ) {
-
-                    // -------------------------------------------------
-                    // PLAYER HEADER
-                    // -------------------------------------------------
-
-                    Row(
-
-                        modifier =
-                            Modifier.fillMaxWidth(),
-
-                        verticalAlignment =
-                            Alignment.CenterVertically
-                    ) {
-
-                        Text(
-
-                            text =
-                                "←",
-
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .titleLarge,
-
-                            modifier =
-                                Modifier
-                                    .padding(
-                                        start = 16.dp
-                                    )
-                                    .clickable {
-                                        onBack()
-                                    }
-                        )
-
-                        AppHeader(
-
-                            searchText =
-                                searchText,
-
-                            onSearchTextChange = {
-                                searchText =
-                                    it
-                            },
-
-                            onSearch = {
-
-                                val query =
-                                    searchText.trim()
-
-                                if (
-                                    query.isNotEmpty()
-                                ) {
-
-                                    onSearch(
-                                        query
-                                    )
-                                }
-                            },
-
-                            searchOpen =
-                                searchOpen,
-
-                            onSearchOpenChange = {
-                                searchOpen =
-                                    it
-                            }
-                        )
-                    }
-
-                    // -------------------------------------------------
-                    // PLAYER SPACE
-                    //
-                    // Chừa đúng vị trí cho AndroidView duy nhất.
-                    // -------------------------------------------------
-
-                    Spacer(
-
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(
-                                    16f / 9f
-                                )
-                    )
-
-                    // -------------------------------------------------
-                    // VIDEO INFO
-                    // -------------------------------------------------
-
-                    Text(
-
-                        text =
-                            video.title,
-
-                        style =
-                            MaterialTheme
-                                .typography
-                                .titleLarge,
-
-                        modifier =
-                            Modifier.padding(
-                                16.dp
-                            )
-                    )
-
-                    Text(
-
-                        text =
-                            video.channel,
-
-                        style =
-                            MaterialTheme
-                                .typography
-                                .bodyMedium,
-
-                        modifier =
-                            Modifier.padding(
-                                horizontal = 16.dp
-                            )
-                    )
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(
-                                16.dp
-                            )
-                    )
-
-                    // -------------------------------------------------
-                    // RELATED HEADER
-                    // -------------------------------------------------
-
-                    Row(
-
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    horizontal = 16.dp
-                                ),
-
-                        verticalAlignment =
-                            Alignment.CenterVertically
-                    ) {
-
-                        Text(
-
-                            text =
-                                "Video liên quan",
-
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .titleLarge,
-
-                            modifier =
-                                Modifier.weight(1f)
-                        )
-
-                        if (
-                            isLoadingRelated
-                        ) {
-
-                            Text(
-
-                                text =
-                                    "Đang tải...",
-
-                                style =
-                                    MaterialTheme
-                                        .typography
-                                        .bodyMedium
-                            )
-                        }
-                    }
-
-                    // -------------------------------------------------
-                    // RELATED ERROR
-                    // -------------------------------------------------
-
-                    relatedErrorMessage?.let { message ->
-
-                        Text(
-
-                            text =
-                                message,
-
-                            color =
-                                Color(0xFFFF6B6B),
-
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .bodyMedium,
-
-                            modifier =
-                                Modifier.padding(
-                                    horizontal = 16.dp,
-                                    vertical = 8.dp
-                                )
-                        )
-                    }
-
-                    // -------------------------------------------------
-                    // RELATED LIST
-                    // -------------------------------------------------
-
-                    relatedVideos.forEach { relatedVideo ->
-
-                        RelatedVideoItem(
-
-                            video =
-                                relatedVideo,
-
-                            onClick = {
-
-                                onVideoSelected(
-                                    relatedVideo
-                                )
-                            }
-                        )
-                    }
-
-                    // -------------------------------------------------
-                    // LOAD MORE
-                    // -------------------------------------------------
-
-                    if (
-                        relatedLoaded &&
-                        relatedNextPageToken != null &&
-                        relatedVideos.size < 25
-                    ) {
-
-                        Text(
-
-                            text =
-                                "Tải thêm video",
-
-                            textAlign =
-                                TextAlign.Center,
-
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .titleMedium,
-
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-
-                                        val token =
-                                            relatedNextPageToken
-                                                ?: return@clickable
-
-                                        loadRelatedVideos(
-                                            token
-                                        )
-                                    }
-                                    .padding(
-                                        16.dp
-                                    )
-                        )
-                    }
-
-                    Spacer(
-                        modifier =
-                            Modifier.height(
-                                24.dp
-                            )
-                    )
-                }
-            }
-        }
-
-        // =====================================================
-        // ONE AND ONLY YOUTUBE PLAYER
-        // =====================================================
-
-        key(
-            video.videoId
+            modifier =
+                Modifier.fillMaxSize()
         ) {
+
+            val playerWidth =
+                minOf(
+                    maxWidth,
+                    maxHeight * (16f / 9f)
+                )
+
+            val playerHeight =
+                playerWidth * (9f / 16f)
 
             AndroidView(
 
@@ -2620,11 +2477,93 @@ fun PlayerScreen(
                                     YouTubePlayer
                                 ) {
 
-                                    youTubePlayer
-                                        .loadVideo(
-                                            video.videoId,
+                                    activePlayer =
+                                        youTubePlayer
+
+                                    youTubePlayer.loadVideo(
+                                        currentAutoplayVideo.value.videoId,
+                                        currentVideoPosition
+                                    )
+                                }
+
+                                override fun onVideoDuration(
+                                    youTubePlayer:
+                                    YouTubePlayer,
+
+                                    duration:
+                                    Float
+                                ) {
+
+                                    videoDuration =
+                                        duration
+                                }
+
+                                override fun onCurrentSecond(
+                                    youTubePlayer: YouTubePlayer,
+                                    second: Float
+                                ) {
+
+                                    currentVideoPosition =
+                                        second
+                                }
+
+                                override fun onStateChange(
+                                    youTubePlayer: YouTubePlayer,
+                                    state: PlayerConstants.PlayerState
+                                ) {
+
+                                    if (
+                                        state !=
+                                        PlayerConstants
+                                            .PlayerState
+                                            .ENDED
+                                    ) {
+                                        return
+                                    }
+
+                                    val nextIndex =
+                                        currentAutoplayCount.value - 1
+
+                                    val nextVideo =
+                                        currentRelatedVideos.value
+                                            .getOrNull(nextIndex)
+
+                                    if (
+                                        nextVideo != null &&
+                                        currentAutoplayCount.value <= 10
+                                    ) {
+
+                                        autoplayVideo =
+                                            nextVideo
+
+                                        autoplayCount =
+                                            currentAutoplayCount.value + 1
+
+                                        autoplayFinished =
+                                            false
+
+                                        videoDuration =
+                                            0f
+                                        currentVideoPosition =
+                                            0f
+                                        youTubePlayer.loadVideo(
+                                            nextVideo.videoId,
                                             0f
                                         )
+
+                                    } else if (
+                                        !relatedLoaded ||
+                                        relatedLoading
+                                    ) {
+
+                                        autoplayWaitingForRelated =
+                                            true
+
+                                    } else {
+
+                                        autoplayFinished =
+                                            true
+                                    }
                                 }
                             }
                         )
@@ -2632,28 +2571,19 @@ fun PlayerScreen(
                 },
 
                 modifier =
+                    Modifier
+                        .width(
+                            playerWidth
+                        )
+                        .height(
+                            playerHeight
+                        )
+                        .align(
+                            Alignment.Center
+                        ),
 
-                    if (isFullscreen) {
-
-                        Modifier
-                            .fillMaxSize()
-
-                    } else {
-
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(
-                                16f / 9f
-                            )
-                            .align(
-                                Alignment.TopCenter
-                            )
-                            .padding(
-                                top = 56.dp
-                            )
-                    },
-
-                onRelease = { playerView ->
+                onRelease = {
+                        playerView ->
 
                     lifecycleOwner
                         ?.lifecycle
@@ -2664,106 +2594,376 @@ fun PlayerScreen(
                     playerView.release()
                 }
             )
-        }
 
-        // =====================================================
-        // FULLSCREEN BUTTON
-        // =====================================================
+            // -----------------------------------------------------
+            // EXIT FULLSCREEN
+            // -----------------------------------------------------
 
-        Box(
+            Box(
 
-            modifier =
-
-                if (isFullscreen) {
-
+                modifier =
                     Modifier
                         .align(
                             Alignment.TopEnd
                         )
                         .padding(8.dp)
+                        .size(48.dp)
+                        .clickable {
 
-                } else {
+                            isFullscreen =
+                                false
+                        },
 
-                    Modifier
-                        .align(
-                            Alignment.TopEnd
-                        )
-                        .padding(
-                            top = 56.dp,
-                            end = 8.dp
-                        )
-                }
-                    .size(48.dp)
-                    .clickable {
+                contentAlignment =
+                    Alignment.Center
+            ) {
 
-                        isFullscreen =
-                            !isFullscreen
+                Text(
+                    text = "✕"
+                )
+            }
+        }
+
+        return
+    }
+
+    // =========================================================
+    // NORMAL MODE
+    // =========================================================
+
+    Surface(
+
+        modifier =
+            Modifier.fillMaxSize(),
+
+        color =
+            MaterialTheme
+                .colorScheme
+                .background,
+
+        contentColor =
+            MaterialTheme
+                .colorScheme
+                .onBackground
+    ) {
+
+        Column(
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(
+                        rememberScrollState()
+                    )
+        ) {
+
+            // -----------------------------------------------------
+            // HEADER
+            // -----------------------------------------------------
+
+            Row(
+
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Text(
+
+                    text =
+                        "←",
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .titleLarge,
+
+                    modifier =
+                        Modifier
+                            .padding(
+                                start = 16.dp
+                            )
+                            .clickable {
+                                onBack()
+                            }
+                )
+
+                AppHeader(
+
+                    searchText =
+                        searchText,
+
+                    onSearchTextChange = {
+                        searchText =
+                            it
                     },
 
-            contentAlignment =
-                Alignment.Center
-        ) {
+                    onSearch = {
+
+                        val query =
+                            searchText.trim()
+
+                        if (
+                            query.isNotEmpty()
+                        ) {
+
+                            onSearch(
+                                query
+                            )
+                        }
+                    },
+
+                    searchOpen =
+                        searchOpen,
+
+                    onSearchOpenChange = {
+                        searchOpen =
+                            it
+                    }
+                )
+            }
+
+            // -----------------------------------------------------
+            // PLAYER
+            // -----------------------------------------------------
+
+            Box(
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(
+                            16f / 9f
+                        )
+            ) {
+
+                AndroidView(
+
+                    factory = { playerContext ->
+
+                        YouTubePlayerView(
+                            playerContext
+                        ).apply {
+
+                            lifecycleOwner
+                                ?.lifecycle
+                                ?.addObserver(
+                                    this
+                                )
+
+                            addYouTubePlayerListener(
+
+                                object :
+                                    AbstractYouTubePlayerListener() {
+
+                                    override fun onReady(
+                                        youTubePlayer:
+                                        YouTubePlayer
+                                    ) {
+
+                                    activePlayer =
+                                        youTubePlayer
+
+                                        youTubePlayer.loadVideo(
+                                            currentAutoplayVideo.value.videoId,
+                                            currentVideoPosition
+                                        )
+                                    }
+
+                                    override fun onVideoDuration(
+                                        youTubePlayer:
+                                        YouTubePlayer,
+
+                                        duration:
+                                        Float
+                                    ) {
+
+                                        videoDuration =
+                                            duration
+                                    }
+
+                                    override fun onCurrentSecond(
+                                        youTubePlayer: YouTubePlayer,
+                                        second: Float
+                                    ) {
+
+                                        currentVideoPosition =
+                                            second
+                                    }
+
+                                override fun onStateChange(
+                                    youTubePlayer: YouTubePlayer,
+                                    state: PlayerConstants.PlayerState
+                                ) {
+
+                                    if (
+                                        state !=
+                                        PlayerConstants
+                                            .PlayerState
+                                            .ENDED
+                                    ) {
+                                        return
+                                    }
+
+                                    val nextIndex =
+                                        currentAutoplayCount.value - 1
+
+                                    val nextVideo =
+                                        currentRelatedVideos.value
+                                            .getOrNull(nextIndex)
+
+                                    if (
+                                        nextVideo != null &&
+                                        currentAutoplayCount.value <= 10
+                                    ) {
+
+                                        autoplayVideo =
+                                            nextVideo
+
+                                        autoplayCount =
+                                            currentAutoplayCount.value + 1
+
+                                        autoplayFinished =
+                                            false
+
+                                        videoDuration =
+                                            0f
+                                        currentVideoPosition =
+                                            0f
+                                        youTubePlayer.loadVideo(
+                                            nextVideo.videoId,
+                                            0f
+                                        )
+
+                                    } else if (
+                                        !relatedLoaded ||
+                                        relatedLoading
+                                    ) {
+
+                                        autoplayWaitingForRelated =
+                                            true
+
+                                    } else {
+
+                                        autoplayFinished =
+                                            true
+                                    }
+                                }
+                                }
+                            )
+                        }
+                    },
+
+                    modifier =
+                        Modifier.fillMaxSize(),
+
+                    onRelease = {
+                            playerView ->
+
+                        lifecycleOwner
+                            ?.lifecycle
+                            ?.removeObserver(
+                                playerView
+                            )
+
+                        playerView.release()
+                    }
+                )
+
+                // -------------------------------------------------
+                // FULLSCREEN BUTTON
+                // -------------------------------------------------
+
+                Box(
+
+                    modifier =
+                        Modifier
+                            .align(
+                                Alignment.BottomEnd
+                            )
+                            .padding(8.dp)
+                            .size(48.dp)
+                            .clickable {
+
+                                isFullscreen =
+                                    true
+                            },
+
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+
+                    Text(
+                        text = "⛶"
+                    )
+                }
+            }
+
+            // -----------------------------------------------------
+            // VIDEO INFO
+            // -----------------------------------------------------
 
             Text(
 
                 text =
-                    if (isFullscreen) {
-                        "✕"
-                    } else {
-                        "⛶"
-                    }
+                    autoplayVideo.title,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .titleLarge,
+
+                modifier =
+                    Modifier.padding(
+                        16.dp
+                    )
+            )
+
+            Text(
+
+                text =
+                    autoplayVideo.channel,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodyMedium,
+
+                modifier =
+                    Modifier.padding(
+                        horizontal = 16.dp
+                    )
+            )
+
+            if (autoplayFinished) {
+
+                Text(
+
+                    text =
+                        "Đã phát hết danh sách video liên quan",
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium,
+
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 16.dp,
+                            vertical = 16.dp
+                        )
+                )
+            }
+
+            Spacer(
+
+                modifier =
+                    Modifier.height(
+                        24.dp
+                    )
             )
         }
-    }
-}
-
-// =========================================================
-// PREVIEWS
-// =========================================================
-
-@Preview(
-    showBackground = true
-)
-@Composable
-fun HomeScreenPreview() {
-
-    MpTubeTheme {
-
-        MainScreen()
-    }
-}
-
-@Preview(
-    showBackground = true
-)
-@Composable
-fun PlayerScreenPreview() {
-
-    MpTubeTheme {
-
-        PlayerScreen(
-
-            video =
-                Video(
-
-                    videoId =
-                        "preview",
-
-                    title =
-                        "Preview Video",
-
-                    channel =
-                        "mpTube",
-
-                    thumbnailUrl =
-                        ""
-                ),
-
-            onBack = {},
-
-            onVideoSelected = {},
-
-            onSearch = {}
-        )
     }
 }

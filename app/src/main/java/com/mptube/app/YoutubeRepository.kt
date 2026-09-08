@@ -102,7 +102,8 @@ class YoutubeRepository(
     suspend fun searchVideos(
         query: String,
         videoCategoryId: String? = null,
-        pageToken: String? = null
+        pageToken: String? = null,
+        maxResults: Int = MAX_SEARCH_RESULTS
     ): YoutubeSearchResponse {
 
         val normalizedQuery =
@@ -208,7 +209,10 @@ class YoutubeRepository(
                         normalizedQuery,
 
                     maxResult =
-                        MAX_SEARCH_RESULTS,
+                        maxResults.coerceIn(
+                            1,
+                            MAX_SEARCH_RESULTS
+                        ),
 
                     pageToken =
                         pageToken,
@@ -463,6 +467,169 @@ class YoutubeRepository(
                         cacheKey
                     )
                 }
+            }
+        }
+    }
+
+    // =========================================================
+// AUTOPLAY VIDEO
+// =========================================================
+
+    suspend fun getAutoplayVideo(
+        currentVideoId: String,
+        currentVideoTitle: String
+    ): Video? {
+
+        val profile =
+            buildAutoplayProfile(
+                currentVideoTitle
+            )
+
+        val response =
+            searchVideos(
+
+                query =
+                    profile.query,
+
+                videoCategoryId =
+                    profile.categoryId,
+
+                maxResults =
+                    1
+            )
+
+        return response.items
+            .asSequence()
+            .filter {
+                it.id.videoId.isNotBlank()
+            }
+            .filter {
+                it.id.videoId != currentVideoId
+            }
+            .map {
+                    item ->
+
+                Video(
+
+                    videoId =
+                        item.id.videoId,
+
+                    title =
+                        item.snippet.title,
+
+                    channel =
+                        item.snippet.channelTitle,
+
+                    thumbnailUrl =
+                        item.snippet
+                            .thumbnails
+                            .medium
+                            .url
+                )
+            }
+            .firstOrNull()
+    }
+    private data class AutoplayProfile(
+        val query: String,
+        val categoryId: String?
+    )
+    private fun buildAutoplayProfile(
+        title: String
+    ): AutoplayProfile {
+
+        val text =
+            title
+                .lowercase()
+                .replace(
+                    Regex("[^\\p{L}\\p{N}\\s]"),
+                    " "
+                )
+                .replace(
+                    Regex("\\s+"),
+                    " "
+                )
+                .trim()
+
+        return when {
+
+            text.contains("bolero") -> {
+
+                AutoplayProfile(
+                    query =
+                        "bolero Việt Nam",
+                    categoryId =
+                        "10"
+                )
+            }
+
+            text.contains("remix") ||
+                    text.contains("vinahouse") ||
+                    text.contains("dj") ||
+                    text.contains("edm") -> {
+
+                AutoplayProfile(
+                    query =
+                        "nhạc remix Việt Nam trending",
+                    categoryId =
+                        "10"
+                )
+            }
+
+            text.contains("lofi") -> {
+
+                AutoplayProfile(
+                    query =
+                        "lofi Việt Nam",
+                    categoryId =
+                        "10"
+                )
+            }
+
+            text.contains("rap") ||
+                    text.contains("hip hop") ||
+                    text.contains("hiphop") -> {
+
+                AutoplayProfile(
+                    query =
+                        "rap Việt trending",
+                    categoryId =
+                        "10"
+                )
+            }
+
+            text.contains("nhạc") ||
+                    text.contains("music") ||
+                    text.contains("lyrics") ||
+                    text.contains("lyric") ||
+                    text.contains("karaoke") ||
+                    text.contains("ballad") ||
+                    text.contains("cover") ||
+                    text.contains("mv") -> {
+
+                AutoplayProfile(
+                    query =
+                        "nhạc Việt trending",
+                    categoryId =
+                        "10"
+                )
+            }
+
+            else -> {
+
+                val words =
+                    text
+                        .split(" ")
+                        .filter {
+                            it.length >= 3
+                        }
+                        .take(5)
+
+                AutoplayProfile(
+                    query =
+                        words.joinToString(" "),
+                    categoryId =
+                        null
+                )
             }
         }
     }
