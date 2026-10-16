@@ -1,0 +1,25 @@
+plugins {
+    id("com.android.test")
+}
+
+android {
+    namespace = "com.mptube.benchmark"
+
+    compileSdk {
+        version = release(37)
+    }
+
+    targetProjectPath = ":app"
+
+    defaultConfig {
+        minSdk = 26
+        targetSdk = 37
+        testInstrumentationRunner =
+            "androidx.test.runner.AndroidJUnitRunner"
+    }
+}
+
+dependencies {
+    implementation("androidx.test.ext:junit:1.3.0")
+    implementation("androidx.benchmark:benchmark-macro-junit4:1.5.0")
+}
