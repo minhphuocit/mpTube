@@ -98,6 +98,7 @@ private fun MusicBrandHeader()
 @Composable
 fun MusicScreen(
     onPlayerFullscreenChanged: (Boolean) -> Unit = {},
+    onGoHome: () -> Unit = {},
     viewModel: MusicViewModel = viewModel()
 )
 {
@@ -116,6 +117,10 @@ fun MusicScreen(
         PlayerScreen(
             video = selected,
             onBack = viewModel::closePlayer,
+            onGoHome = {
+                viewModel.closePlayer()
+                onGoHome()
+            },
             onFullscreenChanged = onPlayerFullscreenChanged
         )
         return

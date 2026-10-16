@@ -24,26 +24,3 @@ mpTube là YouTube client tối giản cho Android, ưu tiên máy yếu và mà
 - Pull-to-refresh bỏ qua cache và lấy dữ liệu mới.
 
 ## Cấu hình API key
-
-Tạo `local.properties` ở thư mục gốc:
-
-```properties
-sdk.dir=DUONG_DAN_ANDROID_SDK
-YOUTUBE_API_KEY=API_KEY_CUA_BAN
-```
-
-Không commit `local.properties` lên Git.
-
-## Test
-
-```bash
-./gradlew :app:testDebugUnitTest
-./gradlew :app:connectedDebugAndroidTest
-./gradlew :benchmark:connectedCheck
-```
-
-Macrobenchmark nên chạy trên thiết bị thật.
-
-## Download MP3
-
-Bản này không triển khai rip audio trực tiếp từ YouTube. YouTube Data API/player không cung cấp URL MP3/audio file để tải trực tiếp; thêm extractor bên ngoài sẽ làm app nặng hơn, kém ổn định và không còn đi theo luồng API/player chính thức.

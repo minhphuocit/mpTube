@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +27,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +40,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +49,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import coil3.compose.AsyncImage
 import com.mptube.app.R
 import com.mptube.app.model.Video
@@ -106,12 +114,15 @@ fun AppHeader(
     onSearch: () -> Unit,
     searchOpen: Boolean,
     onSearchOpenChange: (Boolean) -> Unit,
+    suggestions: List<String> = emptyList(),
+    onSuggestionClick: (String) -> Unit = {},
     centerSearch: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val metrics = rememberMpTubeUiMetrics()
+    val density = LocalDensity.current
 
     @Composable
     fun Brand() {
@@ -164,6 +175,8 @@ fun AppHeader(
 
     @Composable
     fun SearchBar() {
+        var fieldWidthPx by remember { mutableIntStateOf(0) }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -172,43 +185,77 @@ fun AppHeader(
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = onSearchTextChange,
-                placeholder = {
-                    Text("Tìm kiếm video...")
-                },
-                singleLine = true,
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(
-                        if (metrics.largeControls) 64.dp else 56.dp
-                    )
-                    .focusRequester(focusRequester)
-                    .onFocusChanged {
-                        if (it.isFocused) {
-                            onSearchOpenChange(true)
-                        }
-                    },
-                shape = RoundedCornerShape(14.dp),
-                keyboardOptions = KeyboardOptions(
-                    imeAction = ImeAction.Search
-                ),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        if (searchText.trim().isNotEmpty()) {
-                            onSearch()
-                            onSearchOpenChange(false)
-                            focusManager.clearFocus()
-                        }
+                    .onGloballyPositioned { coordinates ->
+                        fieldWidthPx = coordinates.size.width
                     }
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    cursorColor = MaterialTheme.colorScheme.primary
+            ) {
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = onSearchTextChange,
+                    placeholder = {
+                        Text("Tìm kiếm video...")
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(
+                            if (metrics.largeControls) 64.dp else 56.dp
+                        )
+                        .focusRequester(focusRequester)
+                        .onFocusChanged {
+                            if (it.isFocused) {
+                                onSearchOpenChange(true)
+                            }
+                        },
+                    shape = RoundedCornerShape(14.dp),
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            if (searchText.trim().isNotEmpty()) {
+                                onSearch()
+                                onSearchOpenChange(false)
+                                focusManager.clearFocus()
+                            }
+                        }
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        cursorColor = MaterialTheme.colorScheme.primary
+                    )
                 )
-            )
+
+                DropdownMenu(
+                    expanded = searchOpen && searchText.isNotBlank() && suggestions.isNotEmpty(),
+                    onDismissRequest = { onSearchOpenChange(false) },
+                    properties = PopupProperties(focusable = false),
+                    modifier = if (fieldWidthPx > 0) {
+                        Modifier.width(with(density) { fieldWidthPx.toDp() })
+                    } else {
+                        Modifier
+                    }
+                ) {
+                    suggestions.take(6).forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = suggestion,
+                                    maxLines = 1
+                                )
+                            },
+                            onClick = {
+                                focusManager.clearFocus()
+                                onSuggestionClick(suggestion)
+                            }
+                        )
+                    }
+                }
+            }
 
             Spacer(Modifier.width(8.dp))
 

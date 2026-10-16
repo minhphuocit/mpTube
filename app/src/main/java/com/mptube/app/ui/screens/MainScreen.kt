@@ -142,11 +142,13 @@ fun MainScreen() {
         ) {
             when (selectedTab) {
                 0 -> HomeScreen(
-                    onPlayerFullscreenChanged = { isPlayerFullscreen = it }
+                    onPlayerFullscreenChanged = { isPlayerFullscreen = it },
+                    onGoHome = { selectedTab = 0 }
                 )
 
                 1 -> MusicScreen(
-                    onPlayerFullscreenChanged = { isPlayerFullscreen = it }
+                    onPlayerFullscreenChanged = { isPlayerFullscreen = it },
+                    onGoHome = { selectedTab = 0 }
                 )
 
                 else -> AboutScreen()

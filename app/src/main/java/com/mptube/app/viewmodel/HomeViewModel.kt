@@ -6,16 +6,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.mptube.app.SearchSuggestionRepository
 import com.mptube.app.YoutubeRepository
 import com.mptube.app.model.Video
 import com.mptube.app.ui.util.getYoutubeErrorMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val searchText: String = "",
     val searchOpen: Boolean = false,
+    val suggestions: List<String> = emptyList(),
     val videos: List<Video> = emptyList(),
     val searchQuery: String = "",
     val hasSearched: Boolean = false,
@@ -30,19 +33,50 @@ data class HomeUiState(
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = YoutubeRepository(application.applicationContext)
+    private val suggestionRepository = SearchSuggestionRepository()
     private var contentJob: Job? = null
     private var loadMoreJob: Job? = null
+    private var suggestionJob: Job? = null
     private var contentRequestId = 0L
+    private var suggestionRequestId = 0L
 
     var uiState by mutableStateOf(HomeUiState())
         private set
 
     fun setSearchText(value: String) {
         uiState = uiState.copy(searchText = value)
+        if (value.isBlank()) {
+            suggestionJob?.cancel()
+            suggestionRequestId++
+            uiState = uiState.copy(suggestions = emptyList())
+        } else if (uiState.searchOpen) {
+            requestSuggestions(value)
+        }
     }
 
     fun setSearchOpen(value: Boolean) {
-        uiState = uiState.copy(searchOpen = value)
+        uiState = uiState.copy(
+            searchOpen = value,
+            suggestions = if (value) uiState.suggestions else emptyList()
+        )
+
+        if (!value) {
+            suggestionJob?.cancel()
+            suggestionRequestId++
+        } else if (uiState.searchText.isNotBlank()) {
+            requestSuggestions(uiState.searchText)
+        }
+    }
+
+    fun selectSuggestion(value: String) {
+        suggestionJob?.cancel()
+        suggestionRequestId++
+        uiState = uiState.copy(
+            searchText = value,
+            searchOpen = false,
+            suggestions = emptyList()
+        )
+        search(value)
     }
 
     fun openVideo(video: Video) {
@@ -56,7 +90,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun clearToHome() {
         contentJob?.cancel()
         loadMoreJob?.cancel()
+        suggestionJob?.cancel()
         contentRequestId++
+        suggestionRequestId++
         uiState = HomeUiState(searchText = uiState.searchText)
     }
 
@@ -81,6 +117,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         contentJob?.cancel()
         loadMoreJob?.cancel()
+        suggestionJob?.cancel()
+        suggestionRequestId++
         val requestId = ++contentRequestId
 
         contentJob = viewModelScope.launch {
@@ -91,6 +129,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 searchError = null,
                 searchQuery = query,
                 searchText = query,
+                searchOpen = false,
+                suggestions = emptyList(),
                 hasSearched = true,
                 videos = if (refreshing) uiState.videos else emptyList(),
                 nextPageToken = if (refreshing) uiState.nextPageToken else null,
@@ -197,8 +237,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun requestSuggestions(rawQuery: String) {
+        val query = rawQuery.trim().replace(Regex("\\s+"), " ")
+        if (query.isBlank()) {
+            uiState = uiState.copy(suggestions = emptyList())
+            return
+        }
+
+        suggestionJob?.cancel()
+        val requestId = ++suggestionRequestId
+        suggestionJob = viewModelScope.launch {
+            delay(SUGGESTION_DEBOUNCE_MS)
+            try {
+                val suggestions = suggestionRepository.getSuggestions(query)
+                if (
+                    requestId == suggestionRequestId &&
+                    uiState.searchOpen &&
+                    uiState.searchText.trim().replace(Regex("\\s+"), " ") == query
+                ) {
+                    uiState = uiState.copy(suggestions = suggestions)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (requestId == suggestionRequestId) {
+                    uiState = uiState.copy(suggestions = emptyList())
+                }
+            }
+        }
+    }
+
     companion object {
         const val SEARCH_PAGE_SIZE = 25
         const val MAX_VISIBLE_RESULTS = 50
+        private const val SUGGESTION_DEBOUNCE_MS = 320L
     }
 }

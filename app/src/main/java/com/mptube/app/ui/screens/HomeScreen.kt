@@ -30,6 +30,7 @@ import com.mptube.app.viewmodel.HomeViewModel
 @Composable
 fun HomeScreen(
     onPlayerFullscreenChanged: (Boolean) -> Unit = {},
+    onGoHome: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val state = viewModel.uiState
@@ -48,6 +49,10 @@ fun HomeScreen(
         PlayerScreen(
             video = selected,
             onBack = viewModel::closePlayer,
+            onGoHome = {
+                viewModel.closePlayer()
+                onGoHome()
+            },
             onFullscreenChanged = onPlayerFullscreenChanged
         )
         return
@@ -86,6 +91,8 @@ fun HomeScreen(
                     onSearch = viewModel::search,
                     searchOpen = state.searchOpen,
                     onSearchOpenChange = viewModel::setSearchOpen,
+                    suggestions = state.suggestions,
+                    onSuggestionClick = viewModel::selectSuggestion,
                     centerSearch = true,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -99,6 +106,8 @@ fun HomeScreen(
                         onSearch = viewModel::search,
                         searchOpen = state.searchOpen,
                         onSearchOpenChange = viewModel::setSearchOpen,
+                        suggestions = state.suggestions,
+                        onSuggestionClick = viewModel::selectSuggestion,
                         centerSearch = false
                     )
 

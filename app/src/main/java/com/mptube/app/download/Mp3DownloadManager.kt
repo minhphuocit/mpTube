@@ -20,7 +20,9 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import java.io.File
+import java.io.BufferedOutputStream
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
@@ -117,8 +119,9 @@ object Mp3DownloadManager
         return streams
             .asSequence()
             .filter { it.isUrl && it.content.startsWith("http") }
-            .maxByOrNull { stream ->
-                max(stream.averageBitrate, stream.bitrate)
+            .minByOrNull { stream ->
+                val bitrate = max(stream.averageBitrate, stream.bitrate)
+                if (bitrate > 0) bitrate else Int.MAX_VALUE
             }
     }
 
@@ -146,7 +149,7 @@ object Mp3DownloadManager
 
             body.byteStream().use { input ->
                 FileOutputStream(output).buffered().use { out ->
-                    val buffer = ByteArray(64 * 1024)
+                    val buffer = ByteArray(256 * 1024)
                     while (true)
                     {
                         val count = input.read(buffer)
@@ -217,10 +220,12 @@ object Mp3DownloadManager
         var outputEnded = false
         var outputFormat = inputFormat
         var lame: AndroidLame? = null
-        var outputStream: FileOutputStream? = null
+        var outputStream: OutputStream? = null
         var channels = inputFormat.getIntOrDefault(MediaFormat.KEY_CHANNEL_COUNT, 2).coerceIn(1, 2)
         var sampleRate = inputFormat.getIntOrDefault(MediaFormat.KEY_SAMPLE_RATE, 44100)
         var pcmEncoding = AudioFormat.ENCODING_PCM_16BIT
+        var lastProgress = -1
+        val encodeBuffers = ReusableEncodeBuffers()
 
         fun prepareLame()
         {
@@ -229,10 +234,10 @@ object Mp3DownloadManager
                 .setInSampleRate(sampleRate)
                 .setOutSampleRate(sampleRate)
                 .setOutChannels(channels)
-                .setOutBitrate(192)
-                .setQuality(5)
+                .setOutBitrate(128)
+                .setQuality(9)
                 .build()
-            outputStream = FileOutputStream(outputFile)
+            outputStream = BufferedOutputStream(FileOutputStream(outputFile), 128 * 1024)
         }
 
         try
@@ -302,8 +307,14 @@ object Mp3DownloadManager
                         {
                             outputBuffer.position(info.offset)
                             outputBuffer.limit(info.offset + info.size)
-                            val pcm = pcmToShortArray(outputBuffer, pcmEncoding)
-                            encodePcm(lame!!, outputStream!!, pcm, channels)
+                            encodePcmBuffer(
+                                lame = lame!!,
+                                output = outputStream!!,
+                                buffer = outputBuffer,
+                                pcmEncoding = pcmEncoding,
+                                channels = channels,
+                                reusable = encodeBuffers
+                            )
                         }
 
                         if (durationUs > 0)
@@ -311,7 +322,11 @@ object Mp3DownloadManager
                             val progress = ((info.presentationTimeUs * 100L) / durationUs)
                                 .toInt()
                                 .coerceIn(0, 100)
-                            onProgress(progress)
+                            if (progress != lastProgress)
+                            {
+                                lastProgress = progress
+                                onProgress(progress)
+                            }
                         }
 
                         outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
@@ -345,86 +360,87 @@ object Mp3DownloadManager
         return if (containsKey(key)) getInteger(key) else fallback
     }
 
-    private fun pcmToShortArray(buffer: ByteBuffer, pcmEncoding: Int): ShortArray
+    private class ReusableEncodeBuffers
     {
-        val view = buffer.slice().order(ByteOrder.LITTLE_ENDIAN)
-        return if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT)
+        var left = ShortArray(0)
+        var right = ShortArray(0)
+        var mp3 = ByteArray(0)
+
+        fun ensure(sampleCount: Int, mp3Size: Int)
         {
-            val count = view.remaining() / 4
-            ShortArray(count) { index ->
-                val value = view.getFloat(index * 4).coerceIn(-1f, 1f)
-                (value * Short.MAX_VALUE).toInt().toShort()
-            }
-        }
-        else
-        {
-            val shortBuffer = view.asShortBuffer()
-            ShortArray(shortBuffer.remaining()).also { shortBuffer.get(it) }
+            if (left.size < sampleCount) left = ShortArray(sampleCount)
+            if (right.size < sampleCount) right = ShortArray(sampleCount)
+            if (mp3.size < mp3Size) mp3 = ByteArray(mp3Size)
         }
     }
 
-    private fun encodePcm(
+    private fun encodePcmBuffer(
         lame: AndroidLame,
-        output: FileOutputStream,
-        pcm: ShortArray,
-        channels: Int
+        output: OutputStream,
+        buffer: ByteBuffer,
+        pcmEncoding: Int,
+        channels: Int,
+        reusable: ReusableEncodeBuffers
     )
     {
-        if (pcm.isEmpty()) return
+        val view = buffer.slice().order(ByteOrder.LITTLE_ENDIAN)
+        val bytesPerSample = if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
+        val totalSamples = view.remaining() / bytesPerSample
+        val sampleCount = if (channels == 1) totalSamples else totalSamples / 2
+        if (sampleCount <= 0) return
 
-        val encoded = if (channels == 1)
+        val mp3Size = (7200 + sampleCount * 1.25).toInt()
+        reusable.ensure(sampleCount, mp3Size)
+
+        if (pcmEncoding == AudioFormat.ENCODING_PCM_FLOAT)
         {
-            val mp3Buffer = ByteArray((7200 + pcm.size * 1.25).toInt())
-
-            lame.encode(
-                pcm,
-                pcm,
-                pcm.size,
-                mp3Buffer
-            ).also { size ->
-                if (size > 0)
+            if (channels == 1)
+            {
+                for (i in 0 until sampleCount)
                 {
-                    output.write(mp3Buffer, 0, size)
+                    val value = view.getFloat().coerceIn(-1f, 1f)
+                    reusable.left[i] = (value * Short.MAX_VALUE).toInt().toShort()
+                }
+            }
+            else
+            {
+                for (i in 0 until sampleCount)
+                {
+                    val left = view.getFloat().coerceIn(-1f, 1f)
+                    val right = view.getFloat().coerceIn(-1f, 1f)
+                    reusable.left[i] = (left * Short.MAX_VALUE).toInt().toShort()
+                    reusable.right[i] = (right * Short.MAX_VALUE).toInt().toShort()
                 }
             }
         }
         else
         {
-            val sampleCount = pcm.size / 2
-            if (sampleCount == 0) return
-
-            val left = ShortArray(sampleCount)
-            val right = ShortArray(sampleCount)
-
-            var sourceIndex = 0
-
-            for (i in 0 until sampleCount)
+            if (channels == 1)
             {
-                left[i] = pcm[sourceIndex]
-                right[i] = pcm[sourceIndex + 1]
-                sourceIndex += 2
-            }
-
-            val mp3Buffer =
-                ByteArray((7200 + sampleCount * 1.25).toInt())
-
-            lame.encode(
-                left,
-                right,
-                sampleCount,
-                mp3Buffer
-            ).also { size ->
-                if (size > 0)
+                for (i in 0 until sampleCount)
                 {
-                    output.write(mp3Buffer, 0, size)
+                    reusable.left[i] = view.getShort()
+                }
+            }
+            else
+            {
+                for (i in 0 until sampleCount)
+                {
+                    reusable.left[i] = view.getShort()
+                    reusable.right[i] = view.getShort()
                 }
             }
         }
 
-        if (encoded < 0)
-        {
-            error("LAME encode lỗi: $encoded")
-        }
+        val encoded = lame.encode(
+            reusable.left,
+            if (channels == 1) reusable.left else reusable.right,
+            sampleCount,
+            reusable.mp3
+        )
+
+        if (encoded < 0) error("LAME encode lỗi: $encoded")
+        if (encoded > 0) output.write(reusable.mp3, 0, encoded)
     }
 
     private fun saveMp3(context: Context, source: File, video: Video): Result
