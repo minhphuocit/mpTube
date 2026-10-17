@@ -38,13 +38,6 @@ class YoutubeRepository(context: Context) {
     private val preferences = context.getSharedPreferences("youtube_cache", Context.MODE_PRIVATE)
     private val gson = Gson()
 
-    private fun requireApiKey(): String {
-        return BuildConfig.YOUTUBE_API_KEY.trim().also { key ->
-            check(key.isNotEmpty()) {
-                "YouTube API key is missing. Add YOUTUBE_API_KEY to local.properties."
-            }
-        }
-    }
 
     suspend fun searchVideos(
         query: String,
@@ -96,8 +89,7 @@ class YoutubeRepository(context: Context) {
                 query = normalizedQuery,
                 maxResult = resultCount,
                 pageToken = pageToken,
-                videoCategoryId = videoCategoryId,
-                apiKey = requireApiKey()
+                videoCategoryId = videoCategoryId
             )
 
             val savedAt = System.currentTimeMillis()
@@ -162,8 +154,7 @@ class YoutubeRepository(context: Context) {
             val response = YoutubeApi.service.searchVideos(
                 query = buildRelatedQuery(videoTitle),
                 videoCategoryId = if (musicOnly || looksLikeMusic(videoTitle)) MUSIC_CATEGORY_ID else null,
-                maxResult = MAX_RELATED_RESULTS,
-                apiKey = requireApiKey()
+                maxResult = MAX_RELATED_RESULTS
             )
 
             val result = YoutubeRelatedResponse(
@@ -239,8 +230,7 @@ class YoutubeRepository(context: Context) {
                 regionCode = "VN",
                 videoCategoryId = MUSIC_CATEGORY_ID,
                 maxResults = resultCount,
-                pageToken = pageToken,
-                apiKey = requireApiKey()
+                pageToken = pageToken
             )
 
             val savedAt = System.currentTimeMillis()
@@ -293,8 +283,7 @@ class YoutubeRepository(context: Context) {
 
         if (missing.isNotEmpty()) {
             val response = YoutubeApi.service.getVideoDetails(
-                videoIds = missing.joinToString(","),
-                apiKey = requireApiKey()
+                videoIds = missing.joinToString(",")
             )
             val savedAt = System.currentTimeMillis()
 

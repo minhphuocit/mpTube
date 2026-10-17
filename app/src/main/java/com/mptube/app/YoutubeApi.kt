@@ -6,7 +6,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object YoutubeApi {
-    private const val BASE_URL = "https://www.googleapis.com/"
+    private const val BASE_URL = "https://mptube-api.phuocnsm2695.workers.dev/"
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)

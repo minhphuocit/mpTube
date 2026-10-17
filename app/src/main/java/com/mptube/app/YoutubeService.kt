@@ -13,15 +13,13 @@ interface YoutubeService {
         @Query("pageToken") pageToken: String? = null,
         @Query("relevanceLanguage") relevanceLanguage: String = "vi",
         @Query("regionCode") regionCode: String = "VN",
-        @Query("videoCategoryId") videoCategoryId: String? = null,
-        @Query("key") apiKey: String
+        @Query("videoCategoryId") videoCategoryId: String? = null
     ): YoutubeSearchResponse
 
     @GET("youtube/v3/videos")
     suspend fun getVideoDetails(
         @Query("part") part: String = "snippet",
-        @Query("id") videoIds: String,
-        @Query("key") apiKey: String
+        @Query("id") videoIds: String
     ): YoutubeVideoDetailsResponse
 
     @GET("youtube/v3/videos")
@@ -31,7 +29,6 @@ interface YoutubeService {
         @Query("regionCode") regionCode: String = "VN",
         @Query("videoCategoryId") videoCategoryId: String? = null,
         @Query("maxResults") maxResults: Int = 25,
-        @Query("pageToken") pageToken: String? = null,
-        @Query("key") apiKey: String
+        @Query("pageToken") pageToken: String? = null
     ): YoutubeTrendingResponse
 }
