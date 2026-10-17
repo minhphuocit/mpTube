@@ -1,15 +1,17 @@
 package com.mptube.app
 
+import com.google.gson.annotations.SerializedName
+
 data class YoutubeVideoDetailsResponse(
-    val items: List<YoutubeVideoDetailsItem>
+    @SerializedName("items") val items: List<YoutubeVideoDetailsItem>
 )
 
 data class YoutubeVideoDetailsItem(
-    val id: String,
-    val snippet: YoutubeVideoDetailsSnippet
+    @SerializedName("id") val id: String,
+    @SerializedName("snippet") val snippet: YoutubeVideoDetailsSnippet
 )
 
 data class YoutubeVideoDetailsSnippet(
-    val categoryId: String,
-    val title: String
+    @SerializedName("categoryId") val categoryId: String,
+    @SerializedName("title") val title: String
 )

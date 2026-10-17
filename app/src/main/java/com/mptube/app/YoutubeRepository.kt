@@ -35,7 +35,7 @@ class YoutubeRepository(context: Context) {
         private const val MUSIC_CATEGORY_ID = "10"
     }
 
-    private val preferences = context.getSharedPreferences("youtube_cache", Context.MODE_PRIVATE)
+    private val preferences = context.getSharedPreferences("youtube_cache_v2", Context.MODE_PRIVATE)
     private val gson = Gson()
 
 

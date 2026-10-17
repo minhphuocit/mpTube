@@ -1,32 +1,35 @@
 package com.mptube.app
 
+import com.google.gson.annotations.SerializedName
+
 data class YoutubeSearchResponse(
-    val nextPageToken: String?,
-    val items: List<YoutubeSearchItem>
+    @SerializedName("nextPageToken") val nextPageToken: String?,
+    @SerializedName("items") val items: List<YoutubeSearchItem>
 )
 
 data class YoutubeSearchItem(
-    val id: YoutubeVideoId,
-    val snippet: YoutubeSnippet
+    @SerializedName("id") val id: YoutubeVideoId,
+    @SerializedName("snippet") val snippet: YoutubeSnippet
 )
 
 data class YoutubeVideoId(
-    val videoId: String
+    @SerializedName("videoId") val videoId: String
 )
 
 data class YoutubeSnippet(
-    val title: String,
-    val channelTitle: String,
-    val thumbnails: YoutubeThumbnails
+    @SerializedName("title") val title: String,
+    @SerializedName("channelTitle") val channelTitle: String,
+    @SerializedName("thumbnails") val thumbnails: YoutubeThumbnails
 )
 
 data class YoutubeThumbnails(
-    val default: YoutubeThumbnail,
-    val medium: YoutubeThumbnail,
-    val high: YoutubeThumbnail
+    @SerializedName("default") val default: YoutubeThumbnail,
+    @SerializedName("medium") val medium: YoutubeThumbnail,
+    @SerializedName("high") val high: YoutubeThumbnail
 )
+
 data class YoutubeThumbnail(
-    val url: String,
-    val width: Int,
-    val height: Int
+    @SerializedName("url") val url: String,
+    @SerializedName("width") val width: Int,
+    @SerializedName("height") val height: Int
 )

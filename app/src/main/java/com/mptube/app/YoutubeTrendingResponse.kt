@@ -1,23 +1,25 @@
 package com.mptube.app
 
+import com.google.gson.annotations.SerializedName
+
 data class YoutubeTrendingResponse(
-    val nextPageToken: String? = null,
-    val items: List<YoutubeTrendingItem> = emptyList()
+    @SerializedName("nextPageToken") val nextPageToken: String? = null,
+    @SerializedName("items") val items: List<YoutubeTrendingItem> = emptyList()
 )
 
 data class YoutubeTrendingItem(
-    val id: String,
-    val snippet: YoutubeTrendingSnippet
+    @SerializedName("id") val id: String,
+    @SerializedName("snippet") val snippet: YoutubeTrendingSnippet
 )
 
 data class YoutubeTrendingSnippet(
-    val title: String,
-    val channelTitle: String,
-    val thumbnails: YoutubeTrendingThumbnails
+    @SerializedName("title") val title: String,
+    @SerializedName("channelTitle") val channelTitle: String,
+    @SerializedName("thumbnails") val thumbnails: YoutubeTrendingThumbnails
 )
 
 data class YoutubeTrendingThumbnails(
-    val default: YoutubeThumbnail,
-    val medium: YoutubeThumbnail,
-    val high: YoutubeThumbnail
+    @SerializedName("default") val default: YoutubeThumbnail,
+    @SerializedName("medium") val medium: YoutubeThumbnail,
+    @SerializedName("high") val high: YoutubeThumbnail
 )
