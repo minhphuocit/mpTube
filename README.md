@@ -1,4 +1,4 @@
-# mpTube 1.26.04
+# mpTube 1.26.05
 
 mpTube là YouTube client tối giản cho Android, ưu tiên máy yếu và màn hình Android ô tô.
 
@@ -7,7 +7,8 @@ mpTube là YouTube client tối giản cho Android, ưu tiên máy yếu và mà
 - Home chỉ có tìm kiếm video.
 - Tab Âm Nhạc lấy video âm nhạc đang thịnh hành tại Việt Nam bằng `videos.list(chart=mostPopular, videoCategoryId=10, regionCode=VN)`.
 - Xem video, fullscreen bằng một `YouTubePlayerView` duy nhất.
-- Autoplay video liên quan, chống lặp và giới hạn tối đa 10 video.
+- Autoplay video liên quan, chống lặp và giới hạn tối đa 10 video. Video âm nhạc ưu tiên related từ SerpApi và tự fallback sang YouTube khi cần.
+- Có nút Video tiếp theo để người dùng chuyển chủ động sang video liên quan.
 - Kéo từ trên xuống để tải lại kết quả tìm kiếm hoặc trang Âm Nhạc.
 - Nút Back hoạt động theo từng cấp: fullscreen -> player -> kết quả/tab -> Home -> thoát app.
 - Cache RAM + disk, request deduplication, giới hạn cache và force refresh.
@@ -19,8 +20,6 @@ mpTube là YouTube client tối giản cho Android, ưu tiên máy yếu và mà
 - Tìm kiếm chỉ gọi API khi người dùng thực sự bấm tìm.
 - Mỗi trang search lấy 25 kết quả để giảm số lần phân trang.
 - Kết quả search được cache 12 giờ.
-- Related được cache 24 giờ và chỉ prefetch khi video đã xem khoảng 82%.
+- Related được cache 24 giờ và chỉ prefetch khi video đã xem khoảng 99%.
 - Tab Âm Nhạc dùng `videos.list` thay vì `search.list`, cache 15 phút.
 - Pull-to-refresh bỏ qua cache và lấy dữ liệu mới.
-
-## Cấu hình API key

@@ -9,10 +9,10 @@ object SerpApi {
     private const val BASE_URL = "https://mptube-api.phuocnsm2695.workers.dev/"
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .writeTimeout(8, TimeUnit.SECONDS)
-        .callTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(3, TimeUnit.SECONDS)
+        .readTimeout(6, TimeUnit.SECONDS)
+        .writeTimeout(6, TimeUnit.SECONDS)
+        .callTimeout(7, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
 

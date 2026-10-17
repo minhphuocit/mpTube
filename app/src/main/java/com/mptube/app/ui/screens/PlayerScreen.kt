@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -33,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,8 +136,7 @@ fun PlayerScreen(
     var isFullscreen by remember { mutableStateOf(false) }
     var activePlayer by remember { mutableStateOf<YouTubePlayer?>(null) }
     var lastLoadedVideoId by remember { mutableStateOf<String?>(null) }
-    var videoDuration by remember { mutableFloatStateOf(0f) }
-    var currentSecond by remember { mutableFloatStateOf(0f) }
+    val progressState = remember { PlayerProgressState() }
     var isRefreshing by remember { mutableStateOf(false) }
     var isDownloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableIntStateOf(0) }
@@ -161,12 +161,12 @@ fun PlayerScreen(
             }
 
             override fun onVideoDuration(youTubePlayer: YouTubePlayer, duration: Float) {
-                videoDuration = duration
+                progressState.duration = duration
             }
 
             override fun onCurrentSecond(youTubePlayer: YouTubePlayer, second: Float) {
-                currentSecond = second
-                viewModel.onProgress(second, videoDuration)
+                progressState.currentSecond = second
+                viewModel.onProgress(second, progressState.duration)
             }
 
             override fun onStateChange(
@@ -192,8 +192,8 @@ fun PlayerScreen(
 
         if (lastLoadedVideoId != videoId) {
             lastLoadedVideoId = videoId
-            videoDuration = 0f
-            currentSecond = 0f
+            progressState.duration = 0f
+            progressState.currentSecond = 0f
             downloadMessage = null
             downloadProgress = 0
             player.loadVideo(videoId, 0f)
@@ -257,9 +257,9 @@ fun PlayerScreen(
         if (isFullscreen || isRefreshing) return
         isRefreshing = true
         val player = activePlayer
-        val position = currentSecond.coerceAtLeast(0f)
+        val position = progressState.currentSecond.coerceAtLeast(0f)
         if (player != null) {
-            videoDuration = 0f
+            progressState.duration = 0f
             player.loadVideo(currentVideo.videoId, position)
         }
         scope.launch {
@@ -367,43 +367,68 @@ fun PlayerScreen(
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
 
-                    OutlinedButton(
-                        onClick = {
-                            if (isDownloading) return@OutlinedButton
-                            isDownloading = true
-                            downloadProgress = 0
-                            downloadMessage = null
-
-                            scope.launch {
-                                try {
-                                    val result = Mp3DownloadManager.download(
-                                        context = context.applicationContext,
-                                        video = currentVideo,
-                                        onProgress = { progress ->
-                                            scope.launch { downloadProgress = progress }
-                                        }
-                                    )
-                                    downloadMessage = "Đã lưu: ${result.displayName}"
-                                    Toast.makeText(
-                                        context,
-                                        "Đã tải MP3 vào ${result.location}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                } catch (e: Exception) {
-                                    val message = e.message ?: "Không tải được MP3"
-                                    downloadMessage = message
-                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                } finally {
-                                    isDownloading = false
-                                }
-                            }
-                        },
-                        enabled = !isDownloading,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            if (isDownloading) "Đang tải MP3... $downloadProgress%" else "Tải MP3"
-                        )
+                        OutlinedButton(
+                            onClick = viewModel::playNext,
+                            enabled = !state.autoplayFinished && !state.waitingForRelated,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                if (state.waitingForRelated) "Đang chuyển..." else "Video tiếp theo  ›",
+                                maxLines = 1
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (isDownloading) return@OutlinedButton
+                                isDownloading = true
+                                downloadProgress = 0
+                                downloadMessage = null
+
+                                scope.launch {
+                                    try {
+                                        val result = Mp3DownloadManager.download(
+                                            context = context.applicationContext,
+                                            video = currentVideo,
+                                            onProgress = { progress ->
+                                                scope.launch { downloadProgress = progress }
+                                            }
+                                        )
+                                        downloadMessage = "Đã lưu: ${result.displayName}"
+                                        Toast.makeText(
+                                            context,
+                                            "Đã tải MP3 vào ${result.location}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    } catch (e: Exception) {
+                                        val message = e.message ?: "Không tải được MP3"
+                                        downloadMessage = message
+                                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                    } finally {
+                                        isDownloading = false
+                                    }
+                                }
+                            },
+                            enabled = !isDownloading,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_download),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (isDownloading) "$downloadProgress%" else ".mp3",
+                                maxLines = 1
+                            )
+                        }
                     }
 
                     downloadMessage?.let { message ->
@@ -436,5 +461,10 @@ fun PlayerScreen(
         }
     }
 }
+
+private class PlayerProgressState(
+    var currentSecond: Float = 0f,
+    var duration: Float = 0f
+)
 
 private const val VIDEO_ASPECT_RATIO = 16f / 9f

@@ -113,6 +113,18 @@ fun AboutScreen() {
             AboutInfoRow("Phiên bản", "v${BuildConfig.VERSION_NAME}")
             AboutInfoRow("Nền tảng", "Android + Kotlin")
             AboutInfoRow("Trạng thái", "Đang phát triển...")
+            AboutInfoRow("Version code", BuildConfig.VERSION_CODE.toString())
+            AboutInfoRow("Android tối thiểu", "Android 8.0 (API 26)")
+            AboutInfoRow("Khu vực nội dung", "Việt Nam (VN)")
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        AboutCard("Hiệu năng & kiến trúc", R.drawable.ic_code) {
+            AboutBullet("Ưu tiên máy cấu hình yếu: hạn chế recomposition không cần thiết và dùng ảnh chất lượng phù hợp.")
+            AboutBullet("Cache RAM + disk cho dữ liệu YouTube và request deduplication để giảm gọi mạng lặp.")
+            AboutBullet("Related nhạc có cache cục bộ và cache phía Worker để giảm độ trễ và tiết kiệm quota.")
+            AboutBullet("Retrofit + OkHttp với timeout ngắn và fallback để giữ trải nghiệm ổn định khi mạng yếu.")
         }
 
         Spacer(Modifier.height(24.dp))
@@ -192,6 +204,29 @@ private fun AboutLinkItem(
         Text(
             "›",
             style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AboutBullet(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            "•",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

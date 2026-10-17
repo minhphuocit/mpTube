@@ -55,6 +55,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onVideoEnded() {
+        requestNextVideo()
+    }
+
+    fun playNext() {
+        requestNextVideo()
+    }
+
+    private fun requestNextVideo() {
         val state = uiState
         val next = AutoplayPolicy.pickNext(
             relatedVideos = state.relatedVideos,
@@ -167,7 +175,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun loadMusicRelatedVideos(video: Video): List<Video> {
         try {
+            val playedIds = uiState.playedVideoIds
             val serpRelated = serpApiRepository.getRelatedVideos(video.videoId)
+                .filterNot { it.videoId in playedIds }
             val musicRelated = filterMusicVideos(serpRelated)
             if (musicRelated.isNotEmpty()) return musicRelated
         } catch (cancelled: CancellationException) {
