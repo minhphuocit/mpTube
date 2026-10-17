@@ -7,5 +7,6 @@ data class Video(
     val videoId: String,
     val title: String,
     val channel: String,
-    val thumbnailUrl: String
+    val thumbnailUrl: String,
+    val categoryId: String? = null
 )

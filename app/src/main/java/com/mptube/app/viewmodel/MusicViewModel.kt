@@ -75,7 +75,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         videoId = item.id,
                         title = item.snippet.title,
                         channel = item.snippet.channelTitle,
-                        thumbnailUrl = item.snippet.thumbnails.medium.url
+                        thumbnailUrl = item.snippet.thumbnails.medium.url,
+                        categoryId = MUSIC_CATEGORY_ID
                     )
                 }
 
@@ -124,7 +125,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         videoId = item.id,
                         title = item.snippet.title,
                         channel = item.snippet.channelTitle,
-                        thumbnailUrl = item.snippet.thumbnails.medium.url
+                        thumbnailUrl = item.snippet.thumbnails.medium.url,
+                        categoryId = MUSIC_CATEGORY_ID
                     )
                 }.distinctBy { it.videoId }
 
@@ -155,5 +157,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         const val PAGE_SIZE = 25
         const val MAX_VISIBLE_RESULTS = 50
+        private const val MUSIC_CATEGORY_ID = "10"
     }
 }

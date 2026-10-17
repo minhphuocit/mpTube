@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.mptube.app.SerpApiRepository
 import com.mptube.app.YoutubeRepository
 import com.mptube.app.domain.AutoplayPolicy
 import com.mptube.app.model.Video
@@ -27,6 +28,7 @@ data class PlayerUiState(
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = YoutubeRepository(application.applicationContext)
+    private val serpApiRepository = SerpApiRepository()
     private var relatedJob: Job? = null
 
     var uiState by mutableStateOf(PlayerUiState())
@@ -41,7 +43,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             autoplayCount = 1
         )
     }
-
 
     fun stop() {
         relatedJob?.cancel()
@@ -102,22 +103,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         relatedJob?.cancel()
         relatedJob = viewModelScope.launch {
             try {
-                val response = repository.getRelatedVideos(
-                    videoId = video.videoId,
-                    videoTitle = video.title
-                )
+                val related = loadRelatedVideos(video)
 
                 if (uiState.currentVideo?.videoId != video.videoId) return@launch
-
-                val related = response.items.mapNotNull { item ->
-                    val id = item.id.videoId
-                    if (id.isBlank()) null else Video(
-                        videoId = id,
-                        title = item.snippet.title,
-                        channel = item.snippet.channelTitle,
-                        thumbnailUrl = item.snippet.thumbnails.medium.url
-                    )
-                }.distinctBy { it.videoId }
 
                 val updated = uiState.copy(
                     relatedVideos = related,
@@ -157,7 +145,91 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private suspend fun loadRelatedVideos(video: Video): List<Video> {
+        return if (isMusicVideo(video)) {
+            loadMusicRelatedVideos(video)
+        } else {
+            loadFallbackRelatedVideos(video, musicOnly = false)
+        }
+    }
+
+    private suspend fun isMusicVideo(video: Video): Boolean {
+        if (video.categoryId != null) return video.categoryId == MUSIC_CATEGORY_ID
+
+        return try {
+            repository.getVideoCategoryId(video.videoId) == MUSIC_CATEGORY_ID
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private suspend fun loadMusicRelatedVideos(video: Video): List<Video> {
+        try {
+            val serpRelated = serpApiRepository.getRelatedVideos(video.videoId)
+            val musicRelated = filterMusicVideos(serpRelated)
+            if (musicRelated.isNotEmpty()) return musicRelated
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+        }
+
+        return loadFallbackRelatedVideos(video, musicOnly = true)
+    }
+
+    private suspend fun filterMusicVideos(videos: List<Video>): List<Video> {
+        if (videos.isEmpty()) return emptyList()
+
+        val unknownIds = videos
+            .filter { it.categoryId == null }
+            .map { it.videoId }
+
+        val categories = if (unknownIds.isEmpty()) {
+            emptyMap()
+        } else {
+            try {
+                repository.getVideoCategoryIds(unknownIds)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyMap()
+            }
+        }
+
+        return videos
+            .asSequence()
+            .filter { video ->
+                video.categoryId == MUSIC_CATEGORY_ID || categories[video.videoId] == MUSIC_CATEGORY_ID
+            }
+            .map { video ->
+                if (video.categoryId == MUSIC_CATEGORY_ID) video else video.copy(categoryId = MUSIC_CATEGORY_ID)
+            }
+            .distinctBy { it.videoId }
+            .toList()
+    }
+
+    private suspend fun loadFallbackRelatedVideos(video: Video, musicOnly: Boolean): List<Video> {
+        val response = repository.getRelatedVideos(
+            videoId = video.videoId,
+            videoTitle = video.title,
+            musicOnly = musicOnly
+        )
+
+        return response.items.mapNotNull { item ->
+            val id = item.id.videoId
+            if (id.isBlank()) null else Video(
+                videoId = id,
+                title = item.snippet.title,
+                channel = item.snippet.channelTitle,
+                thumbnailUrl = item.snippet.thumbnails.medium.url,
+                categoryId = if (musicOnly) MUSIC_CATEGORY_ID else null
+            )
+        }.distinctBy { it.videoId }
+    }
+
     companion object {
-        private const val RELATED_PREFETCH_PROGRESS = 0.82f
+        private const val RELATED_PREFETCH_PROGRESS = 0.99f
+        private const val MUSIC_CATEGORY_ID = "10"
     }
 }

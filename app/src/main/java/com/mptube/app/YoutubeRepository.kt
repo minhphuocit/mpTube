@@ -17,6 +17,7 @@ class YoutubeRepository(context: Context) {
         private val searchCache = LinkedHashMap<String, CacheEntry<YoutubeSearchResponse>>()
         private val relatedCache = LinkedHashMap<String, CacheEntry<YoutubeRelatedResponse>>()
         private val musicCache = LinkedHashMap<String, CacheEntry<YoutubeTrendingResponse>>()
+        private val categoryCache = LinkedHashMap<String, CacheEntry<String>>()
         private val searchRequests = mutableMapOf<String, CompletableDeferred<YoutubeSearchResponse>>()
         private val relatedRequests = mutableMapOf<String, CompletableDeferred<YoutubeRelatedResponse>>()
         private val musicRequests = mutableMapOf<String, CompletableDeferred<YoutubeTrendingResponse>>()
@@ -24,9 +25,11 @@ class YoutubeRepository(context: Context) {
         private const val SEARCH_CACHE_DURATION = 12L * 60L * 60L * 1000L
         private const val RELATED_CACHE_DURATION = 24L * 60L * 60L * 1000L
         private const val MUSIC_CACHE_DURATION = 15L * 60L * 1000L
+        private const val VIDEO_CATEGORY_CACHE_DURATION = 24L * 60L * 60L * 1000L
         private const val DEFAULT_SEARCH_RESULTS = 25
         private const val API_MAX_RESULTS = 50
         private const val MAX_RELATED_RESULTS = 20
+        private const val MAX_VIDEO_DETAILS_IDS = 50
         private const val MAX_MEMORY_CACHE_ENTRIES = 24
         private const val MAX_DISK_CACHE_ENTRIES_PER_TYPE = 24
         private const val MUSIC_CATEGORY_ID = "10"
@@ -118,9 +121,10 @@ class YoutubeRepository(context: Context) {
     suspend fun getRelatedVideos(
         videoId: String,
         videoTitle: String,
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = false,
+        musicOnly: Boolean = false
     ): YoutubeRelatedResponse {
-        val cacheKey = "related|$videoId"
+        val cacheKey = "related|$videoId|music=$musicOnly"
         val now = System.currentTimeMillis()
 
         if (!forceRefresh) {
@@ -157,7 +161,7 @@ class YoutubeRepository(context: Context) {
         return try {
             val response = YoutubeApi.service.searchVideos(
                 query = buildRelatedQuery(videoTitle),
-                videoCategoryId = if (looksLikeMusic(videoTitle)) MUSIC_CATEGORY_ID else null,
+                videoCategoryId = if (musicOnly || looksLikeMusic(videoTitle)) MUSIC_CATEGORY_ID else null,
                 maxResult = MAX_RELATED_RESULTS,
                 apiKey = requireApiKey()
             )
@@ -255,6 +259,57 @@ class YoutubeRepository(context: Context) {
                 if (musicRequests[cacheKey] === deferred) musicRequests.remove(cacheKey)
             }
         }
+    }
+
+
+    suspend fun getVideoCategoryId(videoId: String): String? {
+        return getVideoCategoryIds(listOf(videoId))[videoId]
+    }
+
+    suspend fun getVideoCategoryIds(videoIds: List<String>): Map<String, String> {
+        val ids = videoIds
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(MAX_VIDEO_DETAILS_IDS)
+            .toList()
+
+        if (ids.isEmpty()) return emptyMap()
+
+        val now = System.currentTimeMillis()
+        val result = LinkedHashMap<String, String>()
+        val missing = mutableListOf<String>()
+
+        mutex.withLock {
+            ids.forEach { id ->
+                val cached = categoryCache[id]
+                if (cached != null && now - cached.time < VIDEO_CATEGORY_CACHE_DURATION) {
+                    result[id] = cached.value
+                } else {
+                    missing += id
+                }
+            }
+        }
+
+        if (missing.isNotEmpty()) {
+            val response = YoutubeApi.service.getVideoDetails(
+                videoIds = missing.joinToString(","),
+                apiKey = requireApiKey()
+            )
+            val savedAt = System.currentTimeMillis()
+
+            mutex.withLock {
+                response.items.forEach { item ->
+                    if (item.id.isNotBlank() && item.snippet.categoryId.isNotBlank()) {
+                        result[item.id] = item.snippet.categoryId
+                        categoryCache[item.id] = CacheEntry(item.snippet.categoryId, savedAt)
+                    }
+                }
+                trimMemoryCache(categoryCache)
+            }
+        }
+
+        return result
     }
 
     private fun buildRelatedQuery(title: String): String {

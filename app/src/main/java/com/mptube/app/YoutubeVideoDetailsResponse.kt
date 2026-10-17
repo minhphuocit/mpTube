@@ -5,6 +5,7 @@ data class YoutubeVideoDetailsResponse(
 )
 
 data class YoutubeVideoDetailsItem(
+    val id: String,
     val snippet: YoutubeVideoDetailsSnippet
 )
 

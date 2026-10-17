@@ -20,7 +20,7 @@ interface YoutubeService {
     @GET("youtube/v3/videos")
     suspend fun getVideoDetails(
         @Query("part") part: String = "snippet",
-        @Query("id") videoId: String,
+        @Query("id") videoIds: String,
         @Query("key") apiKey: String
     ): YoutubeVideoDetailsResponse
 
