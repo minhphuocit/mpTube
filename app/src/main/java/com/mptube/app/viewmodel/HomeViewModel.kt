@@ -1,6 +1,7 @@
 package com.mptube.app.viewmodel
 
 import android.app.Application
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@Immutable
 data class HomeUiState(
     val searchText: String = "",
     val searchOpen: Boolean = false,
@@ -44,13 +46,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     fun setSearchText(value: String) {
-        uiState = uiState.copy(searchText = value)
         if (value.isBlank()) {
             suggestionJob?.cancel()
             suggestionRequestId++
-            uiState = uiState.copy(suggestions = emptyList())
-        } else if (uiState.searchOpen) {
-            requestSuggestions(value)
+            uiState = uiState.copy(searchText = value, suggestions = emptyList())
+        } else {
+            uiState = uiState.copy(searchText = value)
+            if (uiState.searchOpen) requestSuggestions(value)
         }
     }
 
@@ -112,7 +114,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         forceRefresh: Boolean = false,
         refreshing: Boolean = false
     ) {
-        val query = rawQuery.trim().replace(Regex("\\s+"), " ")
+        val query = normalizeQuery(rawQuery)
         if (query.isEmpty()) return
 
         contentJob?.cancel()
@@ -238,7 +240,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun requestSuggestions(rawQuery: String) {
-        val query = rawQuery.trim().replace(Regex("\\s+"), " ")
+        val query = normalizeQuery(rawQuery)
         if (query.isBlank()) {
             uiState = uiState.copy(suggestions = emptyList())
             return
@@ -253,7 +255,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 if (
                     requestId == suggestionRequestId &&
                     uiState.searchOpen &&
-                    uiState.searchText.trim().replace(Regex("\\s+"), " ") == query
+                    normalizeQuery(uiState.searchText) == query
                 ) {
                     uiState = uiState.copy(suggestions = suggestions)
                 }
@@ -267,9 +269,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun normalizeQuery(value: String): String {
+        return value.trim().replace(WHITESPACE_REGEX, " ")
+    }
+
     companion object {
         const val SEARCH_PAGE_SIZE = 25
         const val MAX_VISIBLE_RESULTS = 50
         private const val SUGGESTION_DEBOUNCE_MS = 320L
+        private val WHITESPACE_REGEX = Regex("\\s+")
     }
 }

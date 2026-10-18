@@ -204,7 +204,7 @@ fun AppHeader(
                         .fillMaxWidth()
                         .height(
                             when {
-                                metrics.compactLandscape -> 46.dp
+                                metrics.compactLandscape -> 58.dp
                                 metrics.largeControls -> 64.dp
                                 else -> 56.dp
                             }

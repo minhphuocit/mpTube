@@ -1,6 +1,7 @@
 package com.mptube.app.viewmodel
 
 import android.app.Application
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+@Immutable
 data class MusicUiState(
     val videos: List<Video> = emptyList(),
     val selectedVideo: Video? = null,

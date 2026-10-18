@@ -1,21 +1,14 @@
 package com.mptube.app.download
 
-import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
-import java.util.concurrent.TimeUnit
 
 class NewPipeHttpDownloader private constructor() : Downloader()
 {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
+    private val client = DownloadNetwork.extractor
 
     override fun execute(request: Request): Response
     {

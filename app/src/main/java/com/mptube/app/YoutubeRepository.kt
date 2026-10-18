@@ -2,9 +2,11 @@ package com.mptube.app
 
 import android.content.Context
 import androidx.core.content.edit
-import com.google.gson.Gson
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -14,10 +16,10 @@ class YoutubeRepository(context: Context) {
         private data class CacheEntry<T>(val value: T, val time: Long)
 
         private val mutex = Mutex()
-        private val searchCache = LinkedHashMap<String, CacheEntry<YoutubeSearchResponse>>()
-        private val relatedCache = LinkedHashMap<String, CacheEntry<YoutubeRelatedResponse>>()
-        private val musicCache = LinkedHashMap<String, CacheEntry<YoutubeTrendingResponse>>()
-        private val categoryCache = LinkedHashMap<String, CacheEntry<String>>()
+        private val searchCache = LinkedHashMap<String, CacheEntry<YoutubeSearchResponse>>(16, 0.75f, true)
+        private val relatedCache = LinkedHashMap<String, CacheEntry<YoutubeRelatedResponse>>(16, 0.75f, true)
+        private val musicCache = LinkedHashMap<String, CacheEntry<YoutubeTrendingResponse>>(8, 0.75f, true)
+        private val categoryCache = LinkedHashMap<String, CacheEntry<String>>(32, 0.75f, true)
         private val searchRequests = mutableMapOf<String, CompletableDeferred<YoutubeSearchResponse>>()
         private val relatedRequests = mutableMapOf<String, CompletableDeferred<YoutubeRelatedResponse>>()
         private val musicRequests = mutableMapOf<String, CompletableDeferred<YoutubeTrendingResponse>>()
@@ -33,10 +35,23 @@ class YoutubeRepository(context: Context) {
         private const val MAX_MEMORY_CACHE_ENTRIES = 24
         private const val MAX_DISK_CACHE_ENTRIES_PER_TYPE = 24
         private const val MUSIC_CATEGORY_ID = "10"
+        private val cacheScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val WHITESPACE_REGEX = Regex("\\s+")
+        private val BRACKET_REGEX = Regex("\\[[^]]*]")
+        private val PARENTHESIS_REGEX = Regex("\\([^)]*\\)")
+        private val NON_WORD_REGEX = Regex("[^\\p{L}\\p{N}\\s]")
+        private val IGNORED_RELATED_WORDS = setOf(
+            "official", "video", "lyrics", "lyric", "audio", "mv", "hd", "4k",
+            "vietsub", "karaoke", "full", "music", "nhạc"
+        )
+        private val MUSIC_HINTS = listOf(
+            "music", "nhạc", "lyrics", "lyric", "mv", "audio", "remix", "lofi",
+            "cover", "karaoke", "dj", "edm", "ballad", "rap"
+        )
     }
 
     private val preferences = context.getSharedPreferences("youtube_cache_v2", Context.MODE_PRIVATE)
-    private val gson = Gson()
+    private val gson = NetworkClients.gson
 
 
     suspend fun searchVideos(
@@ -46,7 +61,7 @@ class YoutubeRepository(context: Context) {
         maxResults: Int = DEFAULT_SEARCH_RESULTS,
         forceRefresh: Boolean = false
     ): YoutubeSearchResponse {
-        val normalizedQuery = query.trim().replace(Regex("\\s+"), " ").lowercase()
+        val normalizedQuery = query.trim().replace(WHITESPACE_REGEX, " ").lowercase()
         if (normalizedQuery.isEmpty()) return YoutubeSearchResponse(null, emptyList())
 
         val resultCount = maxResults.coerceIn(1, API_MAX_RESULTS)
@@ -97,7 +112,7 @@ class YoutubeRepository(context: Context) {
                 searchCache[cacheKey] = CacheEntry(response, savedAt)
                 trimMemoryCache(searchCache)
             }
-            saveDiskCache("search", cacheKey, response, savedAt)
+            saveDiskCacheAsync("search", cacheKey, response, savedAt)
             deferred.complete(response)
             response
         } catch (error: Exception) {
@@ -172,7 +187,7 @@ class YoutubeRepository(context: Context) {
                 relatedCache[cacheKey] = CacheEntry(result, savedAt)
                 trimMemoryCache(relatedCache)
             }
-            saveDiskCache("related", cacheKey, result, savedAt)
+            saveDiskCacheAsync("related", cacheKey, result, savedAt)
             deferred.complete(result)
             result
         } catch (error: Exception) {
@@ -238,7 +253,7 @@ class YoutubeRepository(context: Context) {
                 musicCache[cacheKey] = CacheEntry(response, savedAt)
                 trimMemoryCache(musicCache)
             }
-            saveDiskCache("music", cacheKey, response, savedAt)
+            saveDiskCacheAsync("music", cacheKey, response, savedAt)
             deferred.complete(response)
             response
         } catch (error: Exception) {
@@ -303,19 +318,14 @@ class YoutubeRepository(context: Context) {
 
     private fun buildRelatedQuery(title: String): String {
         val cleaned = title
-            .replace(Regex("\\[[^]]*]"), " ")
-            .replace(Regex("\\([^)]*\\)"), " ")
-            .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
-            .replace(Regex("\\s+"), " ")
+            .replace(BRACKET_REGEX, " ")
+            .replace(PARENTHESIS_REGEX, " ")
+            .replace(NON_WORD_REGEX, " ")
+            .replace(WHITESPACE_REGEX, " ")
             .trim()
 
-        val ignored = setOf(
-            "official", "video", "lyrics", "lyric", "audio", "mv", "hd", "4k",
-            "vietsub", "karaoke", "full", "music", "nhạc"
-        )
-
         val words = cleaned.split(" ")
-            .filter { it.length >= 2 && it.lowercase() !in ignored }
+            .filter { it.length >= 2 && it.lowercase() !in IGNORED_RELATED_WORDS }
             .take(8)
 
         return words.joinToString(" ").ifBlank { cleaned.take(100) }
@@ -323,10 +333,7 @@ class YoutubeRepository(context: Context) {
 
     private fun looksLikeMusic(title: String): Boolean {
         val text = title.lowercase()
-        return listOf(
-            "music", "nhạc", "lyrics", "lyric", "mv", "audio", "remix", "lofi",
-            "cover", "karaoke", "dj", "edm", "ballad", "rap"
-        ).any(text::contains)
+        return MUSIC_HINTS.any(text::contains)
     }
 
     private fun buildSearchKey(
@@ -383,18 +390,20 @@ class YoutubeRepository(context: Context) {
         }
     }
 
-    private suspend fun saveDiskCache(
+    private fun saveDiskCacheAsync(
         prefix: String,
         cacheKey: String,
         value: Any,
         time: Long
-    ) = withContext(Dispatchers.IO) {
-        val key = cachePreferenceKey(prefix, cacheKey)
-        preferences.edit {
-            putString(key, gson.toJson(value))
-            putLong("${key}_time", time)
+    ) {
+        cacheScope.launch {
+            val key = cachePreferenceKey(prefix, cacheKey)
+            preferences.edit {
+                putString(key, gson.toJson(value))
+                putLong("${key}_time", time)
+            }
+            pruneDiskCache(prefix)
         }
-        pruneDiskCache(prefix)
     }
 
     private fun pruneDiskCache(prefix: String) {

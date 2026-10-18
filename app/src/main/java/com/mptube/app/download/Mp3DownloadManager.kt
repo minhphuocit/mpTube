@@ -14,7 +14,6 @@ import com.naman14.androidlame.AndroidLame
 import com.naman14.androidlame.LameBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.AudioStream
@@ -25,7 +24,6 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 object Mp3DownloadManager
@@ -35,14 +33,7 @@ object Mp3DownloadManager
         val location: String
     )
 
-    private val httpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
-    }
+    private val httpClient by lazy { DownloadNetwork.stream }
 
     @Volatile
     private var extractorInitialized = false
@@ -90,8 +81,10 @@ object Mp3DownloadManager
             }
 
             onProgress(58)
-            transcodeToMp3(tempAudio, tempMp3) { percent ->
-                onProgress(58 + (percent * 37 / 100))
+            withBackgroundThreadPriority {
+                transcodeToMp3(tempAudio, tempMp3) { percent ->
+                    onProgress(58 + (percent * 37 / 100))
+                }
             }
 
             onProgress(96)
@@ -508,9 +501,33 @@ object Mp3DownloadManager
     private fun sanitizeFileName(value: String): String
     {
         return value
-            .replace(Regex("[\\\\/:*?\"<>|]"), " ")
-            .replace(Regex("\\s+"), " ")
+            .replace(INVALID_FILE_NAME_REGEX, " ")
+            .replace(WHITESPACE_REGEX, " ")
             .trim()
             .take(120)
     }
+
+    private inline fun <T> withBackgroundThreadPriority(block: () -> T): T
+    {
+        val threadId = android.os.Process.myTid()
+        val previousPriority = android.os.Process.getThreadPriority(threadId)
+        return try
+        {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+            block()
+        }
+        finally
+        {
+            try
+            {
+                android.os.Process.setThreadPriority(previousPriority)
+            }
+            catch (_: Exception)
+            {
+            }
+        }
+    }
+
+    private val INVALID_FILE_NAME_REGEX = Regex("[\\\\/:*?\"<>|]")
+    private val WHITESPACE_REGEX = Regex("\\s+")
 }

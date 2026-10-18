@@ -3,11 +3,9 @@ package com.mptube.app
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import java.util.LinkedHashMap
-import java.util.concurrent.TimeUnit
 
 class SearchSuggestionRepository
 {
@@ -16,11 +14,7 @@ class SearchSuggestionRepository
         val suggestions: List<String>
     )
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
-        .callTimeout(7, TimeUnit.SECONDS)
-        .build()
+    private val client = NetworkClients.suggestions
 
     private val cache = object : LinkedHashMap<String, CacheEntry>(MAX_CACHE_ENTRIES, 0.75f, true)
     {
@@ -32,12 +26,13 @@ class SearchSuggestionRepository
 
     suspend fun getSuggestions(rawQuery: String): List<String> = withContext(Dispatchers.IO)
     {
-        val query = rawQuery.trim().replace(Regex("\\s+"), " ")
+        val query = rawQuery.trim().replace(WHITESPACE_REGEX, " ")
         if (query.isBlank()) return@withContext emptyList()
+        val cacheKey = query.lowercase()
 
         synchronized(cache)
         {
-            val cached = cache[query.lowercase()]
+            val cached = cache[cacheKey]
             if (cached != null && System.currentTimeMillis() - cached.createdAt <= CACHE_TTL_MS)
             {
                 return@withContext cached.suggestions
@@ -76,7 +71,7 @@ class SearchSuggestionRepository
 
         synchronized(cache)
         {
-            cache[query.lowercase()] = CacheEntry(System.currentTimeMillis(), suggestions)
+            cache[cacheKey] = CacheEntry(System.currentTimeMillis(), suggestions)
         }
 
         suggestions
@@ -89,5 +84,6 @@ class SearchSuggestionRepository
         private const val CACHE_TTL_MS = 30 * 60 * 1000L
         private const val MAX_CACHE_ENTRIES = 32
         private const val MAX_SUGGESTIONS = 6
+        private val WHITESPACE_REGEX = Regex("\\s+")
     }
 }
