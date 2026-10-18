@@ -1,12 +1,11 @@
 package com.mptube.app.ui.screens
 
 import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -47,11 +46,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -72,6 +74,7 @@ import com.mptube.app.viewmodel.PlayerViewModel
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -143,8 +146,13 @@ private fun CarPlayerControls(
     currentSecondState: State<Float>,
     durationState: State<Float>,
     playbackRate: PlayerConstants.PlaybackRate,
+    playbackQualityLabel: String,
+    nextEnabled: Boolean,
+    isDownloading: Boolean,
+    downloadProgress: Int,
     onPlaybackRateChange: (PlayerConstants.PlaybackRate) -> Unit,
-    onShare: () -> Unit,
+    onNext: () -> Unit,
+    onDownload: () -> Unit,
     onFullscreen: () -> Unit
 ) {
     var isSeeking by remember { mutableStateOf(false) }
@@ -156,7 +164,7 @@ private fun CarPlayerControls(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+        color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
@@ -207,13 +215,6 @@ private fun CarPlayerControls(
                 }
 
                 CarControlButton(
-                    iconRes = if (playerState == PlayerConstants.PlayerState.PLAYING) R.drawable.ic_pause else R.drawable.ic_play,
-                    contentDescription = if (playerState == PlayerConstants.PlayerState.PLAYING) "Tạm dừng" else "Phát"
-                ) {
-                    if (playerState == PlayerConstants.PlayerState.PLAYING) player?.pause() else player?.play()
-                }
-
-                CarControlButton(
                     text = "+10",
                     contentDescription = "Tiến 10 giây"
                 ) {
@@ -221,11 +222,18 @@ private fun CarPlayerControls(
                 }
 
                 CarControlButton(
-                    text = "↗",
-                    contentDescription = "Chia sẻ"
+                    iconRes = if (playerState == PlayerConstants.PlayerState.PLAYING) R.drawable.ic_pause else R.drawable.ic_play,
+                    contentDescription = if (playerState == PlayerConstants.PlayerState.PLAYING) "Tạm dừng" else "Phát"
                 ) {
-                    onShare()
+                    if (playerState == PlayerConstants.PlayerState.PLAYING) player?.pause() else player?.play()
                 }
+
+                CarControlButton(
+                    text = ">>",
+                    contentDescription = "Video tiếp theo",
+                    enabled = nextEnabled,
+                    onClick = onNext
+                )
 
                 Box {
                     CarControlButton(
@@ -240,9 +248,19 @@ private fun CarPlayerControls(
                         onDismissRequest = { settingsOpen = false }
                     ) {
                         Text(
-                            text = "Tốc độ phát",
+                            text = "Chất lượng video",
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                        Text(
+                            text = "YouTube tự động • $playbackQualityLabel",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                        Text(
+                            text = "Tốc độ phát",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 6.dp)
                         )
                         CAR_PLAYBACK_RATES.forEach { option ->
                             DropdownMenuItem(
@@ -262,11 +280,18 @@ private fun CarPlayerControls(
                 }
 
                 CarControlButton(
+                    iconRes = R.drawable.ic_download,
+                    smallLabel = if (isDownloading) "$downloadProgress%" else ".mp3",
+                    contentDescription = if (isDownloading) "Đang tải MP3" else "Tải MP3",
+                    enabled = !isDownloading,
+                    onClick = onDownload
+                )
+
+                CarControlButton(
                     text = "⛶",
-                    contentDescription = "Toàn màn hình"
-                ) {
-                    onFullscreen()
-                }
+                    contentDescription = "Toàn màn hình",
+                    onClick = onFullscreen
+                )
             }
         }
     }
@@ -277,17 +302,41 @@ private fun CarControlButton(
     contentDescription: String,
     text: String? = null,
     iconRes: Int? = null,
+    smallLabel: String? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = Modifier
             .size(42.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
-            .clickable(onClick = onClick),
+            .background(MaterialTheme.colorScheme.surface, CircleShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         when {
+            iconRes != null && smallLabel != null -> Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = smallLabel,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
             iconRes != null -> Icon(
                 painter = painterResource(iconRes),
                 contentDescription = contentDescription,
@@ -302,13 +351,41 @@ private fun CarControlButton(
     }
 }
 
-private fun shareVideo(context: Context, video: Video) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, video.title)
-        putExtra(Intent.EXTRA_TEXT, "${video.title}\nhttps://youtu.be/${video.videoId}")
+@Composable
+private fun CarVideoTouchBlocker(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    event.changes.forEach { it.consume() }
+                }
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerRefreshContainer(
+    carPlayerMode: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    if (carPlayerMode) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            content()
+        }
+    } else {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            content()
+        }
     }
-    context.startActivity(Intent.createChooser(intent, "Chia sẻ video"))
 }
 
 private fun formatPlayerTime(seconds: Float): String {
@@ -316,6 +393,21 @@ private fun formatPlayerTime(seconds: Float): String {
     val minutes = totalSeconds / 60
     val remainingSeconds = totalSeconds % 60
     return "$minutes:${remainingSeconds.toString().padStart(2, '0')}"
+}
+
+private fun formatPlaybackQuality(quality: PlayerConstants.PlaybackQuality): String {
+    return when (quality.name.lowercase()) {
+        "tiny" -> "144p"
+        "small" -> "240p"
+        "medium" -> "360p"
+        "large" -> "480p"
+        "hd720" -> "720p"
+        "hd1080" -> "1080p"
+        "hd1440" -> "1440p"
+        "hd2160" -> "2160p"
+        "highres", "high_res" -> "Cao nhất"
+        else -> "Tự động"
+    }
 }
 
 private data class CarPlaybackRateOption(
@@ -345,12 +437,15 @@ fun PlayerScreen(
     val lifecycleOwner = context as? LifecycleOwner
     val state = viewModel.uiState
     val metrics = rememberMpTubeUiMetrics()
+    val carPlayerMode = remember { metrics.carLikeLandscape }
     val scope = rememberCoroutineScope()
 
     var isFullscreen by remember { mutableStateOf(false) }
+    val carControlsActive = rememberUpdatedState(carPlayerMode && !isFullscreen)
     var activePlayer by remember { mutableStateOf<YouTubePlayer?>(null) }
     var playerState by remember { mutableStateOf(PlayerConstants.PlayerState.UNKNOWN) }
     var playbackRate by remember { mutableStateOf(PlayerConstants.PlaybackRate.RATE_1) }
+    var playbackQualityLabel by remember { mutableStateOf("Tự động") }
     val carCurrentSecond = remember { mutableFloatStateOf(0f) }
     val carDuration = remember { mutableFloatStateOf(0f) }
     val runtimeState = remember(activity) {
@@ -368,28 +463,28 @@ fun PlayerScreen(
         viewModel.start(video)
     }
 
-    val playerView = remember(context) { YouTubePlayerView(context) }
-
-    DisposableEffect(playerView, lifecycleOwner) {
-        lifecycleOwner?.lifecycle?.addObserver(playerView)
-
-        val listener = object : AbstractYouTubePlayerListener() {
+    val playerListener = remember(viewModel, runtimeState, carPlayerMode) {
+        object : AbstractYouTubePlayerListener() {
             override fun onReady(youTubePlayer: YouTubePlayer) {
                 activePlayer = youTubePlayer
+                if (carPlayerMode && runtimeState.lastLoadedVideoId == null) {
+                    runtimeState.lastLoadedVideoId = video.videoId
+                    youTubePlayer.loadVideo(video.videoId, 0f)
+                }
             }
 
             override fun onVideoDuration(youTubePlayer: YouTubePlayer, duration: Float) {
                 runtimeState.duration = duration
-                carDuration.floatValue = duration
+                if (carControlsActive.value) carDuration.floatValue = duration
             }
 
             override fun onCurrentSecond(youTubePlayer: YouTubePlayer, second: Float) {
                 runtimeState.currentSecond = second
-                if (
+                if (carControlsActive.value && (
                     runtimeState.lastCarUiSecond < 0f ||
                     second < runtimeState.lastCarUiSecond ||
                     second - runtimeState.lastCarUiSecond >= CAR_UI_PROGRESS_INTERVAL_SECONDS
-                ) {
+                )) {
                     runtimeState.lastCarUiSecond = second
                     carCurrentSecond.floatValue = second
                 }
@@ -403,28 +498,75 @@ fun PlayerScreen(
                 }
             }
 
+            override fun onPlaybackQualityChange(
+                youTubePlayer: YouTubePlayer,
+                playbackQuality: PlayerConstants.PlaybackQuality
+            ) {
+                if (carPlayerMode) {
+                    val label = formatPlaybackQuality(playbackQuality)
+                    runtimeState.playbackQualityLabel = label
+                    if (carControlsActive.value) playbackQualityLabel = label
+                }
+            }
+
             override fun onPlaybackRateChange(
                 youTubePlayer: YouTubePlayer,
                 playbackRateValue: PlayerConstants.PlaybackRate
             ) {
-                playbackRate = playbackRateValue
+                if (carPlayerMode) {
+                    runtimeState.playbackRate = playbackRateValue
+                    if (carControlsActive.value) playbackRate = playbackRateValue
+                }
             }
 
             override fun onStateChange(
                 youTubePlayer: YouTubePlayer,
                 state: PlayerConstants.PlayerState
             ) {
-                playerState = state
+                if (carPlayerMode) {
+                    runtimeState.playerState = state
+                    if (carControlsActive.value) playerState = state
+                }
                 if (state == PlayerConstants.PlayerState.ENDED) viewModel.onVideoEnded()
             }
         }
+    }
 
-        playerView.addYouTubePlayerListener(listener)
+    var carPlayerView by remember(context, carPlayerMode) { mutableStateOf<YouTubePlayerView?>(null) }
+    val phonePlayerView = remember(context, carPlayerMode) {
+        if (carPlayerMode) null else YouTubePlayerView(context)
+    }
+    val playerView = if (carPlayerMode) carPlayerView else phonePlayerView
+
+    LaunchedEffect(carPlayerMode, context) {
+        if (!carPlayerMode || carPlayerView != null) return@LaunchedEffect
+
+        withFrameNanos { }
+        val view = YouTubePlayerView(context).apply {
+            enableAutomaticInitialization = false
+        }
+        lifecycleOwner?.lifecycle?.addObserver(view)
+        val playerOptions = IFramePlayerOptions.Builder(context)
+            .controls(0)
+            .ivLoadPolicy(3)
+            .build()
+        view.initialize(playerListener, true, playerOptions)
+        carPlayerView = view
+    }
+
+    DisposableEffect(playerView, lifecycleOwner, carPlayerMode) {
+        val view = playerView
+        if (view != null && !carPlayerMode) {
+            lifecycleOwner?.lifecycle?.addObserver(view)
+            view.addYouTubePlayerListener(playerListener)
+        }
 
         onDispose {
-            activePlayer = null
-            lifecycleOwner?.lifecycle?.removeObserver(playerView)
-            playerView.release()
+            if (view != null) {
+                activePlayer = null
+                lifecycleOwner?.lifecycle?.removeObserver(view)
+                view.release()
+            }
         }
     }
 
@@ -440,7 +582,12 @@ fun PlayerScreen(
             runtimeState.lastCarUiSecond = -1f
             carCurrentSecond.floatValue = 0f
             carDuration.floatValue = 0f
+            runtimeState.playerState = PlayerConstants.PlayerState.UNKNOWN
+            runtimeState.playbackRate = PlayerConstants.PlaybackRate.RATE_1
+            runtimeState.playbackQualityLabel = "Tự động"
+            playerState = PlayerConstants.PlayerState.UNKNOWN
             playbackRate = PlayerConstants.PlaybackRate.RATE_1
+            if (carPlayerMode) playbackQualityLabel = "Tự động"
             downloadMessage = null
             downloadProgress = 0
             player.loadVideo(videoId, 0f)
@@ -449,6 +596,14 @@ fun PlayerScreen(
 
     LaunchedEffect(isFullscreen) {
         onFullscreenChanged(isFullscreen)
+        if (carPlayerMode && !isFullscreen) {
+            carCurrentSecond.floatValue = runtimeState.currentSecond
+            carDuration.floatValue = runtimeState.duration
+            playerState = runtimeState.playerState
+            playbackRate = runtimeState.playbackRate
+            playbackQualityLabel = runtimeState.playbackQualityLabel
+            runtimeState.lastCarUiSecond = runtimeState.currentSecond
+        }
         val currentActivity = activity ?: return@LaunchedEffect
         val controller = WindowInsetsControllerCompat(
             currentActivity.window,
@@ -500,6 +655,43 @@ fun PlayerScreen(
 
     val currentVideo = state.currentVideo ?: video
 
+    fun startCarDownload() {
+        if (!carPlayerMode || isDownloading) return
+        isDownloading = true
+        downloadProgress = 0
+        downloadMessage = null
+
+        val videoToDownload = currentVideo
+        scope.launch {
+            try {
+                var lastUiProgress = -5
+                val result = Mp3DownloadManager.download(
+                    context = context.applicationContext,
+                    video = videoToDownload,
+                    onProgress = { progress ->
+                        if (progress == 100 || progress - lastUiProgress >= CAR_DOWNLOAD_UI_STEP) {
+                            lastUiProgress = progress
+                            scope.launch { downloadProgress = progress }
+                        }
+                    }
+                )
+                Toast.makeText(
+                    context,
+                    "Đã tải MP3 vào ${result.location}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    e.message ?: "Không tải được MP3",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                isDownloading = false
+            }
+        }
+    }
+
     fun refreshPlayer() {
         if (isFullscreen || isRefreshing) return
         isRefreshing = true
@@ -521,10 +713,10 @@ fun PlayerScreen(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground
     ) {
-        PullToRefreshBox(
+        PlayerRefreshContainer(
+            carPlayerMode = carPlayerMode,
             isRefreshing = isRefreshing,
-            onRefresh = ::refreshPlayer,
-            modifier = Modifier.fillMaxSize()
+            onRefresh = ::refreshPlayer
         ) {
             Column(
                 modifier = if (isFullscreen) {
@@ -580,10 +772,24 @@ fun PlayerScreen(
                                 .aspectRatio(VIDEO_ASPECT_RATIO)
                         }
 
-                        AndroidView(
-                            factory = { playerView },
-                            modifier = playerModifier.align(Alignment.Center)
-                        )
+                        if (playerView != null) {
+                            AndroidView(
+                                factory = { playerView },
+                                modifier = playerModifier.align(Alignment.Center)
+                            )
+                        } else {
+                            Text(
+                                text = "Đang mở video...",
+                                color = Color.White,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+
+                        if (carPlayerMode) {
+                            CarVideoTouchBlocker(
+                                modifier = playerModifier.align(Alignment.Center)
+                            )
+                        }
 
                         Box(
                             modifier = Modifier
@@ -604,12 +810,28 @@ fun PlayerScreen(
                             .aspectRatio(VIDEO_ASPECT_RATIO),
                         contentAlignment = Alignment.Center
                     ) {
-                        AndroidView(
-                            factory = { playerView },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                        if (playerView != null) {
+                            AndroidView(
+                                factory = { playerView },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Đang mở video...",
+                                    color = Color.White
+                                )
+                            }
+                        }
 
-                        if (!metrics.carLikeLandscape) {
+                        if (carPlayerMode) {
+                            CarVideoTouchBlocker(Modifier.fillMaxSize())
+                        } else {
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
@@ -624,7 +846,7 @@ fun PlayerScreen(
                     }
                 }
 
-                if (!isFullscreen && metrics.carLikeLandscape) {
+                if (!isFullscreen && carPlayerMode) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth(metrics.contentWidthFraction)
@@ -637,8 +859,16 @@ fun PlayerScreen(
                             currentSecondState = carCurrentSecond,
                             durationState = carDuration,
                             playbackRate = playbackRate,
-                            onPlaybackRateChange = { playbackRate = it },
-                            onShare = { shareVideo(context, currentVideo) },
+                            playbackQualityLabel = playbackQualityLabel,
+                            nextEnabled = !state.autoplayFinished && !state.waitingForRelated,
+                            isDownloading = isDownloading,
+                            downloadProgress = downloadProgress,
+                            onPlaybackRateChange = { rate ->
+                                runtimeState.playbackRate = rate
+                                playbackRate = rate
+                            },
+                            onNext = viewModel::playNext,
+                            onDownload = ::startCarDownload,
                             onFullscreen = { isFullscreen = true }
                         )
                     }
@@ -663,77 +893,79 @@ fun PlayerScreen(
                             .padding(horizontal = 16.dp)
                     )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
-                            .align(Alignment.CenterHorizontally)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = viewModel::playNext,
-                            enabled = !state.autoplayFinished && !state.waitingForRelated,
-                            modifier = Modifier.weight(1f)
+                    if (!carPlayerMode) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
+                                .align(Alignment.CenterHorizontally)
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                if (state.waitingForRelated) "Đang chuyển..." else "Video tiếp theo  ›",
-                                maxLines = 1
-                            )
-                        }
+                            OutlinedButton(
+                                onClick = viewModel::playNext,
+                                enabled = !state.autoplayFinished && !state.waitingForRelated,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    if (state.waitingForRelated) "Đang chuyển..." else "Video tiếp theo  ›",
+                                    maxLines = 1
+                                )
+                            }
 
-                        OutlinedButton(
-                            onClick = {
-                                if (isDownloading) return@OutlinedButton
-                                isDownloading = true
-                                downloadProgress = 0
-                                downloadMessage = null
+                            OutlinedButton(
+                                onClick = {
+                                    if (isDownloading) return@OutlinedButton
+                                    isDownloading = true
+                                    downloadProgress = 0
+                                    downloadMessage = null
 
-                                scope.launch {
-                                    try {
-                                        val result = Mp3DownloadManager.download(
-                                            context = context.applicationContext,
-                                            video = currentVideo,
-                                            onProgress = { progress ->
-                                                scope.launch { downloadProgress = progress }
-                                            }
-                                        )
-                                        downloadMessage = "Đã lưu: ${result.displayName}"
-                                        Toast.makeText(
-                                            context,
-                                            "Đã tải MP3 vào ${result.location}",
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                    } catch (e: Exception) {
-                                        val message = e.message ?: "Không tải được MP3"
-                                        downloadMessage = message
-                                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                    } finally {
-                                        isDownloading = false
+                                    scope.launch {
+                                        try {
+                                            val result = Mp3DownloadManager.download(
+                                                context = context.applicationContext,
+                                                video = currentVideo,
+                                                onProgress = { progress ->
+                                                    scope.launch { downloadProgress = progress }
+                                                }
+                                            )
+                                            downloadMessage = "Đã lưu: ${result.displayName}"
+                                            Toast.makeText(
+                                                context,
+                                                "Đã tải MP3 vào ${result.location}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        } catch (e: Exception) {
+                                            val message = e.message ?: "Không tải được MP3"
+                                            downloadMessage = message
+                                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            isDownloading = false
+                                        }
                                     }
-                                }
-                            },
-                            enabled = !isDownloading,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_download),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
+                                },
+                                enabled = !isDownloading,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_download),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (isDownloading) "$downloadProgress%" else ".mp3",
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        downloadMessage?.let { message ->
                             Text(
-                                if (isDownloading) "$downloadProgress%" else ".mp3",
-                                maxLines = 1
+                                text = message,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = metrics.bodySize),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                             )
                         }
-                    }
-
-                    downloadMessage?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = metrics.bodySize),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                        )
                     }
 
                     if (state.relatedLoading) {
@@ -766,9 +998,13 @@ private class PlayerRuntimeState(
     var lastProgressDispatchSecond: Float = -1f,
     var lastCarUiSecond: Float = -1f,
     var previousOrientation: Int = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED,
-    var orientationForced: Boolean = false
+    var orientationForced: Boolean = false,
+    var playerState: PlayerConstants.PlayerState = PlayerConstants.PlayerState.UNKNOWN,
+    var playbackRate: PlayerConstants.PlaybackRate = PlayerConstants.PlaybackRate.RATE_1,
+    var playbackQualityLabel: String = "Tự động"
 )
 
 private const val VIDEO_ASPECT_RATIO = 16f / 9f
 private const val PROGRESS_DISPATCH_INTERVAL_SECONDS = 1f
 private const val CAR_UI_PROGRESS_INTERVAL_SECONDS = 1f
+private const val CAR_DOWNLOAD_UI_STEP = 5

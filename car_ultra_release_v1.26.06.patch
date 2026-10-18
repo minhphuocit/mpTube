@@ -1,0 +1,67 @@
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -13,8 +13,8 @@
+         applicationId = "com.mptube.app"
+         minSdk = 26
+         targetSdk = 37
+-        versionCode = 12605
+-        versionName = "1.26.05"
++        versionCode = 12606
++        versionName = "1.26.06"
+ 
+         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+     }
+--- a/app/src/main/java/com/mptube/app/ui/screens/PlayerScreen.kt
++++ b/app/src/main/java/com/mptube/app/ui/screens/PlayerScreen.kt
+@@ -152,7 +152,8 @@
+     downloadProgress: Int,
+     onPlaybackRateChange: (PlayerConstants.PlaybackRate) -> Unit,
+     onNext: () -> Unit,
+-    onDownload: () -> Unit
++    onDownload: () -> Unit,
++    onFullscreen: () -> Unit
+ ) {
+     var isSeeking by remember { mutableStateOf(false) }
+     var seekValue by remember { mutableFloatStateOf(0f) }
+@@ -285,6 +286,12 @@
+                     enabled = !isDownloading,
+                     onClick = onDownload
+                 )
++
++                CarControlButton(
++                    text = "⛶",
++                    contentDescription = "Toàn màn hình",
++                    onClick = onFullscreen
++                )
+             }
+         }
+     }
+@@ -802,18 +809,6 @@
+ 
+                         if (carPlayerMode) {
+                             CarVideoTouchBlocker(Modifier.fillMaxSize())
+-                            Box(
+-                                modifier = Modifier
+-                                    .align(Alignment.BottomEnd)
+-                                    .padding(8.dp)
+-                            ) {
+-                                CarControlButton(
+-                                    text = "⛶",
+-                                    contentDescription = "Toàn màn hình"
+-                                ) {
+-                                    isFullscreen = true
+-                                }
+-                            }
+                         } else {
+                             Box(
+                                 modifier = Modifier
+@@ -851,7 +846,8 @@
+                                 playbackRate = rate
+                             },
+                             onNext = viewModel::playNext,
+-                            onDownload = ::startCarDownload
++                            onDownload = ::startCarDownload,
++                            onFullscreen = { isFullscreen = true }
+                         )
+                     }
+                 }
