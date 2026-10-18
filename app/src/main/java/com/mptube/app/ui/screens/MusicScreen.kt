@@ -49,8 +49,8 @@ private fun MusicBrandHeader()
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = if (metrics.largeControls) 24.dp else 24.dp,
-                vertical = 12.dp
+                horizontal = if (metrics.compactLandscape) 16.dp else 24.dp,
+                vertical = if (metrics.compactLandscape) 6.dp else 12.dp
             ),
         verticalAlignment = Alignment.CenterVertically
     )
@@ -59,7 +59,11 @@ private fun MusicBrandHeader()
             painter = painterResource(R.drawable.mptube_logo),
             contentDescription = "mpTube",
             modifier = Modifier.size(
-                if (metrics.largeControls) 48.dp else 38.dp
+                when {
+                    metrics.compactLandscape -> 30.dp
+                    metrics.largeControls -> 48.dp
+                    else -> 38.dp
+                }
             ),
             contentScale = ContentScale.Fit
         )
@@ -68,7 +72,11 @@ private fun MusicBrandHeader()
 
         Text(
             text = "mp",
-            fontSize = if (metrics.largeControls) 28.sp else 22.sp,
+            fontSize = when {
+                metrics.compactLandscape -> 18.sp
+                metrics.largeControls -> 28.sp
+                else -> 22.sp
+            },
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onBackground
         )
@@ -78,7 +86,11 @@ private fun MusicBrandHeader()
                 .clip(RoundedCornerShape(5.dp))
                 .background(Color(0xFFFF2020))
                 .padding(
-                    horizontal = if (metrics.largeControls) 7.dp else 5.dp,
+                    horizontal = when {
+                        metrics.compactLandscape -> 4.dp
+                        metrics.largeControls -> 7.dp
+                        else -> 5.dp
+                    },
                     vertical = 1.dp
                 ),
             contentAlignment = Alignment.Center
@@ -86,7 +98,11 @@ private fun MusicBrandHeader()
         {
             Text(
                 text = "Tube",
-                fontSize = if (metrics.largeControls) 27.sp else 21.sp,
+                fontSize = when {
+                    metrics.compactLandscape -> 17.sp
+                    metrics.largeControls -> 27.sp
+                    else -> 21.sp
+                },
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White
             )
@@ -104,6 +120,7 @@ fun MusicScreen(
 {
     val state = viewModel.uiState
     val listState = rememberLazyListState()
+    val metrics = rememberMpTubeUiMetrics()
 
     LaunchedEffect(state.listVersion)
     {
@@ -134,10 +151,10 @@ fun MusicScreen(
 
         Text(
             text = "HOT TRENDING MUSICS",
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineSmall.copy(fontSize = metrics.titleSize),
             modifier = Modifier.padding(
-                horizontal = 24.dp,
-                vertical = 8.dp
+                horizontal = if (metrics.compactLandscape) 16.dp else 24.dp,
+                vertical = if (metrics.compactLandscape) 4.dp else 8.dp
             )
         )
 

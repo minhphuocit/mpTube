@@ -121,8 +121,8 @@ fun AppHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    horizontal = if (metrics.largeControls) 24.dp else 24.dp,
-                    vertical = 12.dp
+                    horizontal = if (metrics.compactLandscape) 16.dp else 24.dp,
+                    vertical = if (metrics.compactLandscape) 6.dp else 12.dp
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -130,7 +130,11 @@ fun AppHeader(
                 painter = painterResource(R.drawable.mptube_logo),
                 contentDescription = "mpTube",
                 modifier = Modifier.size(
-                    if (metrics.largeControls) 48.dp else 38.dp
+                    when {
+                        metrics.compactLandscape -> 30.dp
+                        metrics.largeControls -> 48.dp
+                        else -> 38.dp
+                    }
                 ),
                 contentScale = ContentScale.Fit
             )
@@ -139,7 +143,11 @@ fun AppHeader(
 
             Text(
                 text = "mp",
-                fontSize = if (metrics.largeControls) 28.sp else 22.sp,
+                fontSize = when {
+                    metrics.compactLandscape -> 18.sp
+                    metrics.largeControls -> 28.sp
+                    else -> 22.sp
+                },
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -156,7 +164,11 @@ fun AppHeader(
             ) {
                 Text(
                     text = "Tube",
-                    fontSize = if (metrics.largeControls) 27.sp else 21.sp,
+                    fontSize = when {
+                        metrics.compactLandscape -> 17.sp
+                        metrics.largeControls -> 27.sp
+                        else -> 21.sp
+                    },
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White
                 )
@@ -168,9 +180,13 @@ fun AppHeader(
     fun SearchBar() {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
                 .padding(
-                    horizontal = if (metrics.largeControls) 80.dp else 34.dp
+                    horizontal = when {
+                        metrics.compactLandscape -> 12.dp
+                        metrics.largeControls -> 80.dp
+                        else -> 34.dp
+                    }
                 ),
             verticalAlignment = Alignment.Top
         ) {
@@ -187,7 +203,11 @@ fun AppHeader(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(
-                            if (metrics.largeControls) 64.dp else 56.dp
+                            when {
+                                metrics.compactLandscape -> 46.dp
+                                metrics.largeControls -> 64.dp
+                                else -> 56.dp
+                            }
                         )
                         .focusRequester(focusRequester)
                         .onFocusChanged {
@@ -246,7 +266,11 @@ fun AppHeader(
 
             IconButton(
                 modifier = Modifier.size(
-                    if (metrics.largeControls) 64.dp else 48.dp
+                    when {
+                        metrics.compactLandscape -> 44.dp
+                        metrics.largeControls -> 64.dp
+                        else -> 48.dp
+                    }
                 ),
                 onClick = {
                     if (searchText.trim().isNotEmpty()) {
@@ -263,7 +287,11 @@ fun AppHeader(
                     painter = painterResource(R.drawable.ic_search),
                     contentDescription = "Tìm kiếm",
                     modifier = Modifier.size(
-                        if (metrics.largeControls) 30.dp else 24.dp
+                        when {
+                            metrics.compactLandscape -> 22.dp
+                            metrics.largeControls -> 30.dp
+                            else -> 24.dp
+                        }
                     )
                 )
             }
@@ -316,40 +344,45 @@ fun VideoItem(
 ) {
     val metrics = rememberMpTubeUiMetrics()
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal = if (metrics.largeControls) 24.dp else 16.dp
-            )
-            .clickable(onClick = onClick)
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
     ) {
-        AsyncImage(
-            model = video.thumbnailUrl,
-            contentDescription = "Thumbnail: ${video.title}",
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(12.dp)),
-            contentScale = ContentScale.Crop,
-            filterQuality = FilterQuality.Low
-        )
+                .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
+                .padding(
+                    horizontal = if (metrics.compactLandscape) 8.dp else if (metrics.largeControls) 24.dp else 16.dp
+                )
+                .clickable(onClick = onClick)
+        ) {
+            AsyncImage(
+                model = video.thumbnailUrl,
+                contentDescription = "Thumbnail: ${video.title}",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop,
+                filterQuality = FilterQuality.Low
+            )
 
-        Text(
-            text = video.title,
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontSize = metrics.titleSize
-            ),
-            maxLines = 2,
-            modifier = Modifier.padding(top = 8.dp)
-        )
+            Text(
+                text = video.title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = metrics.titleSize
+                ),
+                maxLines = 2,
+                modifier = Modifier.padding(top = 8.dp)
+            )
 
-        Text(
-            text = video.channel,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = metrics.bodySize
-            ),
-            maxLines = 1
-        )
+            Text(
+                text = video.channel,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = metrics.bodySize
+                ),
+                maxLines = 1
+            )
+        }
     }
 }

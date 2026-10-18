@@ -46,7 +46,7 @@ fun MainScreen() {
     Scaffold(
         bottomBar = {
             if (!isPlayerFullscreen) {
-                if (metrics.largeControls) {
+                if (metrics.compactLandscape || metrics.largeControls) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -62,7 +62,7 @@ fun MainScreen() {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_home),
                                     contentDescription = "Home",
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(if (metrics.compactLandscape) 20.dp else 28.dp)
                                 )
                             },
                             label = "Home",
@@ -75,7 +75,7 @@ fun MainScreen() {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_music),
                                     contentDescription = "Âm nhạc",
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(if (metrics.compactLandscape) 20.dp else 28.dp)
                                 )
                             },
                             label = "Âm Nhạc",
@@ -88,7 +88,7 @@ fun MainScreen() {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_info),
                                     contentDescription = "Thông tin",
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(if (metrics.compactLandscape) 20.dp else 28.dp)
                                 )
                             },
                             label = "Thông Tin",

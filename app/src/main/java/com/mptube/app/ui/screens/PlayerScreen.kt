@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,7 +85,11 @@ private fun PlayerBrandHeader(onGoHome: () -> Unit)
             painter = painterResource(R.drawable.mptube_logo),
             contentDescription = "Về Home",
             modifier = Modifier.size(
-                if (metrics.largeControls) 48.dp else 38.dp
+                when {
+                    metrics.compactLandscape -> 30.dp
+                    metrics.largeControls -> 48.dp
+                    else -> 38.dp
+                }
             ),
             contentScale = ContentScale.Fit
         )
@@ -93,7 +98,11 @@ private fun PlayerBrandHeader(onGoHome: () -> Unit)
 
         Text(
             text = "mp",
-            fontSize = if (metrics.largeControls) 28.sp else 22.sp,
+            fontSize = when {
+                metrics.compactLandscape -> 18.sp
+                metrics.largeControls -> 28.sp
+                else -> 22.sp
+            },
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onBackground
         )
@@ -108,7 +117,11 @@ private fun PlayerBrandHeader(onGoHome: () -> Unit)
         {
             Text(
                 text = "Tube",
-                fontSize = if (metrics.largeControls) 27.sp else 21.sp,
+                fontSize = when {
+                    metrics.compactLandscape -> 17.sp
+                    metrics.largeControls -> 27.sp
+                    else -> 21.sp
+                },
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White
             )
@@ -135,6 +148,7 @@ fun PlayerScreen(
 
     var isFullscreen by remember { mutableStateOf(false) }
     var activePlayer by remember { mutableStateOf<YouTubePlayer?>(null) }
+    var playerState by remember { mutableStateOf(PlayerConstants.PlayerState.UNKNOWN) }
     var lastLoadedVideoId by remember { mutableStateOf<String?>(null) }
     val progressState = remember { PlayerProgressState() }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -173,6 +187,7 @@ fun PlayerScreen(
                 youTubePlayer: YouTubePlayer,
                 state: PlayerConstants.PlayerState
             ) {
+                playerState = state
                 if (state == PlayerConstants.PlayerState.ENDED) viewModel.onVideoEnded()
             }
         }
@@ -291,16 +306,19 @@ fun PlayerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(64.dp),
+                            .height(if (metrics.compactLandscape) 48.dp else 64.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "←",
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier
-                                .size(64.dp)
+                                .size(if (metrics.compactLandscape) 48.dp else 64.dp)
                                 .clickable(onClick = onBack)
-                                .padding(start = 16.dp, top = 18.dp)
+                                .padding(
+                                    start = if (metrics.compactLandscape) 12.dp else 16.dp,
+                                    top = if (metrics.compactLandscape) 11.dp else 18.dp
+                                )
                         )
 
                         PlayerBrandHeader(onGoHome = onGoHome)
@@ -314,7 +332,8 @@ fun PlayerScreen(
                             .background(Color.Black)
                     } else {
                         Modifier
-                            .fillMaxWidth()
+                            .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
+                            .align(Alignment.CenterHorizontally)
                             .aspectRatio(VIDEO_ASPECT_RATIO)
                     },
                     contentAlignment = Alignment.Center
@@ -342,11 +361,47 @@ fun PlayerScreen(
                         modifier = playerModifier.align(Alignment.Center)
                     )
 
+                    if (!isFullscreen && metrics.carLikeLandscape && activePlayer != null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(58.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.58f))
+                                .clickable {
+                                    val player = activePlayer ?: return@clickable
+                                    if (playerState == PlayerConstants.PlayerState.PLAYING) {
+                                        player.pause()
+                                    } else {
+                                        player.play()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    if (playerState == PlayerConstants.PlayerState.PLAYING) {
+                                        R.drawable.ic_pause
+                                    } else {
+                                        R.drawable.ic_play
+                                    }
+                                ),
+                                contentDescription = if (playerState == PlayerConstants.PlayerState.PLAYING) {
+                                    "Tạm dừng"
+                                } else {
+                                    "Phát"
+                                },
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                    }
+
                     Box(
                         modifier = Modifier
                             .align(if (isFullscreen) Alignment.TopEnd else Alignment.BottomEnd)
                             .padding(8.dp)
-                            .size(64.dp)
+                            .size(if (!isFullscreen && metrics.compactLandscape) 44.dp else 64.dp)
                             .clickable { isFullscreen = !isFullscreen },
                         contentAlignment = Alignment.Center
                     ) {
@@ -358,18 +413,25 @@ fun PlayerScreen(
                     Text(
                         text = currentVideo.title,
                         style = MaterialTheme.typography.titleLarge.copy(fontSize = metrics.titleSize),
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
+                            .align(Alignment.CenterHorizontally)
+                            .padding(16.dp)
                     )
 
                     Text(
                         text = currentVideo.channel,
                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = metrics.bodySize),
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        modifier = Modifier
+                            .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
+                            .align(Alignment.CenterHorizontally)
+                            .padding(horizontal = 16.dp)
                     )
 
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxWidth(if (metrics.compactLandscape) metrics.contentWidthFraction else 1f)
+                            .align(Alignment.CenterHorizontally)
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
