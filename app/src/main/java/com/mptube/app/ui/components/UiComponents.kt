@@ -1,5 +1,12 @@
 package com.mptube.app.ui.components
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,6 +42,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +54,7 @@ import coil3.compose.AsyncImage
 import com.mptube.app.R
 import com.mptube.app.model.Video
 import com.mptube.app.ui.util.rememberMpTubeUiMetrics
+import java.util.Locale
 
 @Composable
 fun SearchStateMessage(
@@ -108,12 +117,32 @@ fun AppHeader(
     onSearchOpenChange: (Boolean) -> Unit,
     suggestions: List<String> = emptyList(),
     onSuggestionClick: (String) -> Unit = {},
+    onVoiceSearch: (String) -> Unit = {},
     centerSearch: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
     val metrics = rememberMpTubeUiMetrics()
+    val voiceSearchLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val query = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+                ?.trim()
+                .orEmpty()
+
+            if (query.isNotEmpty()) {
+                onSearchTextChange(query)
+                onSearchOpenChange(false)
+                focusManager.clearFocus()
+                onVoiceSearch(query)
+            }
+        }
+    }
 
     @Composable
     fun Brand() {
@@ -228,6 +257,33 @@ fun AppHeader(
                             }
                         }
                     ),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Nói nội dung cần tìm")
+                                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                                }
+
+                                try {
+                                    voiceSearchLauncher.launch(intent)
+                                } catch (_: ActivityNotFoundException) {
+                                    Toast.makeText(
+                                        context,
+                                        "Thiết bị chưa có dịch vụ nhận dạng giọng nói.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_mic),
+                                contentDescription = "Tìm bằng giọng nói"
+                            )
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface,

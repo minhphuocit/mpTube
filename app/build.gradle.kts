@@ -13,8 +13,8 @@ android {
         applicationId = "com.mptube.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12606
-        versionName = "1.26.06"
+        versionCode = 12607
+        versionName = "1.26.07"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

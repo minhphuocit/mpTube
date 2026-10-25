@@ -93,6 +93,7 @@ fun HomeScreen(
                     onSearchOpenChange = viewModel::setSearchOpen,
                     suggestions = state.suggestions,
                     onSuggestionClick = viewModel::selectSuggestion,
+                    onVoiceSearch = { query -> viewModel.search(query) },
                     centerSearch = true,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -108,6 +109,7 @@ fun HomeScreen(
                         onSearchOpenChange = viewModel::setSearchOpen,
                         suggestions = state.suggestions,
                         onSuggestionClick = viewModel::selectSuggestion,
+                        onVoiceSearch = { query -> viewModel.search(query) },
                         centerSearch = false
                     )
 

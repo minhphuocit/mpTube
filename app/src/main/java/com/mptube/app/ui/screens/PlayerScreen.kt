@@ -673,11 +673,18 @@ fun PlayerScreen(
                             lastUiProgress = progress
                             scope.launch { downloadProgress = progress }
                         }
-                    }
+                    },
+                    carCompatibilityMode = true
                 )
                 Toast.makeText(
                     context,
                     "Đã tải MP3 vào ${result.location}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (e: LinkageError) {
+                Toast.makeText(
+                    context,
+                    "Bộ mã hóa MP3 không tương thích với thiết bị này.",
                     Toast.LENGTH_LONG
                 ).show()
             } catch (e: Exception) {

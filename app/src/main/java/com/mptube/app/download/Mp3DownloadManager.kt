@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.media.AudioFormat
 import android.media.MediaCodec
+import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.os.Build
@@ -14,6 +15,7 @@ import com.naman14.androidlame.AndroidLame
 import com.naman14.androidlame.LameBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.schabi.newpipe.extractor.MediaFormat as NewPipeMediaFormat
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.AudioStream
@@ -41,7 +43,8 @@ object Mp3DownloadManager
     suspend fun download(
         context: Context,
         video: Video,
-        onProgress: (Int) -> Unit = {}
+        onProgress: (Int) -> Unit = {},
+        carCompatibilityMode: Boolean = false
     ): Result = withContext(Dispatchers.IO)
     {
         ensureExtractor()
@@ -49,7 +52,7 @@ object Mp3DownloadManager
 
         val watchUrl = "https://www.youtube.com/watch?v=${video.videoId}"
         val info = StreamInfo.getInfo(ServiceList.YouTube, watchUrl)
-        var audioStream = chooseAudioStream(info.audioStreams)
+        var audioStream = chooseAudioStream(info.audioStreams, carCompatibilityMode)
             ?: error("Không tìm thấy audio stream có thể tải.")
 
         onProgress(8)
@@ -73,7 +76,7 @@ object Mp3DownloadManager
 
                 tempAudio.delete()
                 val refreshedInfo = StreamInfo.getInfo(ServiceList.YouTube, watchUrl)
-                audioStream = chooseAudioStream(refreshedInfo.audioStreams)
+                audioStream = chooseAudioStream(refreshedInfo.audioStreams, carCompatibilityMode)
                     ?: throw firstError
                 downloadStream(audioStream.content, tempAudio) { percent ->
                     onProgress(8 + (percent * 47 / 100))
@@ -82,7 +85,11 @@ object Mp3DownloadManager
 
             onProgress(58)
             withBackgroundThreadPriority {
-                transcodeToMp3(tempAudio, tempMp3) { percent ->
+                transcodeToMp3(
+                    inputFile = tempAudio,
+                    outputFile = tempMp3,
+                    preferSoftwareDecoder = carCompatibilityMode
+                ) { percent ->
                     onProgress(58 + (percent * 37 / 100))
                 }
             }
@@ -107,15 +114,27 @@ object Mp3DownloadManager
         extractorInitialized = true
     }
 
-    private fun chooseAudioStream(streams: List<AudioStream>): AudioStream?
+    private fun chooseAudioStream(
+        streams: List<AudioStream>,
+        preferM4a: Boolean
+    ): AudioStream?
     {
-        return streams
-            .asSequence()
-            .filter { it.isUrl && it.content.startsWith("http") }
-            .minByOrNull { stream ->
-                val bitrate = max(stream.averageBitrate, stream.bitrate)
-                if (bitrate > 0) bitrate else Int.MAX_VALUE
-            }
+        val available = streams.filter { it.isUrl && it.content.startsWith("http") }
+        if (available.isEmpty()) return null
+
+        val candidates = if (preferM4a)
+        {
+            available.filter { it.format == NewPipeMediaFormat.M4A }.ifEmpty { available }
+        }
+        else
+        {
+            available
+        }
+
+        return candidates.minByOrNull { stream ->
+            val bitrate = max(stream.averageBitrate, stream.bitrate)
+            if (bitrate > 0) bitrate else Int.MAX_VALUE
+        }
     }
 
     private fun downloadStream(
@@ -169,6 +188,7 @@ object Mp3DownloadManager
     private fun transcodeToMp3(
         inputFile: File,
         outputFile: File,
+        preferSoftwareDecoder: Boolean,
         onProgress: (Int) -> Unit
     )
     {
@@ -198,7 +218,7 @@ object Mp3DownloadManager
         extractor.selectTrack(trackIndex)
         val mime = inputFormat.getString(MediaFormat.KEY_MIME)
             ?: error("Không xác định được codec audio.")
-        val decoder = MediaCodec.createDecoderByType(mime)
+        val decoder = createAudioDecoder(mime, preferSoftwareDecoder)
         decoder.configure(inputFormat, null, null, 0)
         decoder.start()
 
@@ -346,6 +366,27 @@ object Mp3DownloadManager
             decoder.release()
             extractor.release()
         }
+    }
+
+    private fun createAudioDecoder(mime: String, preferSoftwareDecoder: Boolean): MediaCodec
+    {
+        if (preferSoftwareDecoder && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+        {
+            val softwareCodec = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                .codecInfos
+                .asSequence()
+                .filter { !it.isEncoder && it.isSoftwareOnly }
+                .firstOrNull { codec ->
+                    codec.supportedTypes.any { supported -> supported.equals(mime, ignoreCase = true) }
+                }
+
+            if (softwareCodec != null)
+            {
+                return MediaCodec.createByCodecName(softwareCodec.name)
+            }
+        }
+
+        return MediaCodec.createDecoderByType(mime)
     }
 
     private fun MediaFormat.getIntOrDefault(key: String, fallback: Int): Int
